@@ -1,4 +1,5 @@
 ﻿using Cosmos.HAL;
+using Cosmos.HAL.Debug;
 using Cosmoss.Core;
 using System;
 using System.Collections.Generic;
@@ -26,6 +27,9 @@ namespace CosmosACPIAMl
         {
             Global.TextScreen = new TextScreen();
             Cosmos.Core.Global.Init();
+            Console.Clear();
+            Console.WriteLine("Starting PCI");
+            PCI.Setup();
             Console.WriteLine("Starting ACPI");
             mDebugger.Send("ACPI Init");
             try
@@ -36,6 +40,8 @@ namespace CosmosACPIAMl
             {
                 Console.WriteLine("ACPI Start error: "+e.Message);
             }
+            Console.WriteLine("ACPI init done");
+            while (true) { }
         }
     }
 }

@@ -1,5 +1,5 @@
 ﻿using ACPILibs.AML;
-using Cosmos.Core;
+using Cosmoss.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -31,7 +31,7 @@ namespace ACPILibs.Parser2
 			while (_source.Position < _source.Length)
 			{
 				ParseNode op = ParseFullOpCodeNode();
-
+				ACPI.Log("Node: " + op.Name);
 				root.Nodes.Add(op);
 			}
 
@@ -140,7 +140,7 @@ namespace ACPILibs.Parser2
 								break;
 
 							default:
-								Global.mDebugger.Send("psargs.c / line 913 - Unknown arg: " + op.Op.ParseArgs[x].ToString());
+								ACPI.Log("psargs.c / line 913 - Unknown arg: " + op.Op.ParseArgs[x].ToString());
 								break;
 						}
 					}
@@ -160,14 +160,33 @@ namespace ACPILibs.Parser2
 				}
 			}
 
-			Global.mDebugger.Send("OpCode = " + op.Op.ToString());
-			Global.mDebugger.Send("Start = " + op.Start.ToString());
-			Global.mDebugger.Send("Length = " + op.Length.ToString());
-			Global.mDebugger.Send("End = " + op.End.ToString());
+			ACPI.Log("OpCode = " + op.Op.ToString(), false);
+			ACPI.Log("Start = " + op.Start.ToString(), false);
+			ACPI.Log("Length = " + op.Length.ToString(), false);
+			ACPI.Log("End = " + op.End.ToString(), false);
 			if (op.ConstantValue != null)
 			{
-				Global.mDebugger.Send("Value = " + ValueToString(op.ConstantValue));
+				ACPI.Log("Value = " + ValueToString(op.ConstantValue), false);
 			}
+			if (op.Arguments.Count != 0)
+            {
+				ACPI.Log("Arguments:");
+				foreach (var item in op.Arguments)
+                {
+					if(item is string s)
+                    {
+						ACPI.Log($" -s {s}");
+					}
+					else if (item is int i)
+                    {
+						ACPI.Log($" -int {i}");
+					}
+                    else
+                    {
+						ACPI.Log($" -u " + ValueToString(op.ConstantValue));
+					}
+                }
+            }
 
 			return op;
 		}
@@ -183,7 +202,7 @@ namespace ACPILibs.Parser2
 			if (val is byte)
 				return "0x" + ((byte)val).ToString("X2");
 
-			if (val.GetType().IsArray)
+			if (val is Array)
 			{
 				Array ar = (Array)val;
 
@@ -374,7 +393,7 @@ namespace ACPILibs.Parser2
 					pos -= 1; //The op code byte is the data itself
 					break;
 				case OpCodeClass.ClassUnknown:
-					Global.mDebugger.Send("Unknown AML opcode: 0x" + op.ToString("X"));
+					ACPI.Log("Unknown AML opcode: 0x" + op.ToString("X"));
 					break;
 				default:
 					_source.Seek(info.CodeByteSize, SeekOrigin.Current);

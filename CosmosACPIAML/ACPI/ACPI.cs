@@ -598,7 +598,7 @@ namespace Cosmoss.Core
                 pm1aIO = new IOPort((ushort)PM1a_CNT);
                 pm1bIO = new IOPort((ushort)PM1b_CNT);
                 ResetRegister = new IOPort((ushort)FADT->ResetReg.Address);
-
+                Console.WriteLine("DSDT addr: " + FADT->Dsdt);
                 if (acpiCheckHeader((byte*)FADT->Dsdt, "DSDT") == 0)
                 {
                     Log("Found valid DSDT");
@@ -610,7 +610,7 @@ namespace Cosmoss.Core
 
                     ReadHeader(_reader);
 
-                    var dsdtBlock = new MemoryBlock08(dsdtAddress, SdtLength);
+                    var dsdtBlock = new MemoryBlock08(dsdtAddress + (uint)sizeof(AcpiHeader), SdtLength - (uint)sizeof(AcpiHeader));
 
                     Stream stream = new MemoryStream(dsdtBlock.ToArray());
 
@@ -626,6 +626,7 @@ namespace Cosmoss.Core
                         Log("Node: " + item.Name);
                     }
                 }
+
             }
             else if (signature == "APIC")
             {
@@ -671,9 +672,11 @@ namespace Cosmoss.Core
             }
         }
 
-        private static void Log(string m)
+        public static void Log(string m, bool console = true)
         {
-            Console.WriteLine(m);
+            Global.mDebugger.Send(m);
+            if (console)
+                Console.WriteLine(m);
         }
 
         /// <summary>
