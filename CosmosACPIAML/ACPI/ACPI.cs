@@ -674,7 +674,7 @@ namespace Cosmoss.Core
 
         public static void Log(string m, bool console = true)
         {
-            Global.mDebugger.Send(m);
+           //Global.mDebugger.Send(m);
             if (console)
                 Console.WriteLine(m);
         }

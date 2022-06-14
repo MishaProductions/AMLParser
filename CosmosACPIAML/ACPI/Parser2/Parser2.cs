@@ -140,7 +140,7 @@ namespace ACPILibs.Parser2
 								break;
 
 							default:
-								ACPI.Log("psargs.c / line 913 - Unknown arg: " + op.Op.ParseArgs[x].ToString());
+								ACPI.Log("psargs.c / line 913 - Unknown arg");
 								break;
 						}
 					}
@@ -160,35 +160,35 @@ namespace ACPILibs.Parser2
 				}
 			}
 
-			ACPI.Log("OpCode = " + op.Op.ToString(), false);
-			ACPI.Log("Start = " + op.Start.ToString(), false);
-			ACPI.Log("Length = " + op.Length.ToString(), false);
-			ACPI.Log("End = " + op.End.ToString(), false);
-			if (op.ConstantValue != null)
-			{
-				ACPI.Log("Value = " + ValueToString(op.ConstantValue), false);
-			}
-			if (op.Arguments.Count != 0)
+            ACPI.Log("OpCode = " + op.Op.ToString(), false);
+            ACPI.Log("Start = " + op.Start.ToString(), false);
+            ACPI.Log("Length = " + op.Length.ToString(), false);
+            ACPI.Log("End = " + op.End.ToString(), false);
+            if (op.ConstantValue != null)
             {
-				ACPI.Log("Arguments:");
-				foreach (var item in op.Arguments)
-                {
-					if(item is string s)
-                    {
-						ACPI.Log($" -s {s}");
-					}
-					else if (item is int i)
-                    {
-						ACPI.Log($" -int {i}");
-					}
-                    else
-                    {
-						ACPI.Log($" -u " + ValueToString(op.ConstantValue));
-					}
-                }
+                ACPI.Log("Value = " + ValueToString(op.ConstantValue), false);
             }
+            //if (op.Arguments.Count != 0)
+            //{
+            //    ACPI.Log("Arguments:");
+            //    foreach (var item in op.Arguments)
+            //    {
+            //        if (item is string s)
+            //        {
+            //            ACPI.Log($" -s {s}");
+            //        }
+            //        else if (item is int i)
+            //        {
+            //            ACPI.Log($" -int {i}");
+            //        }
+            //        else
+            //        {
+            //            ACPI.Log($" -u " + ValueToString(op.ConstantValue));
+            //        }
+            //    }
+            //}
 
-			return op;
+            return op;
 		}
 
 		private static string ValueToString(object val)
