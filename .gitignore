@@ -1,5 +1,3 @@
 .vs/
-CosmosACPIAML/bin/
-CosmosACPIAML/obj/
-Test/bin/
-Test/obj/
+bin/
+obj/

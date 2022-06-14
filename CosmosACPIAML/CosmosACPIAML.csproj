@@ -32,7 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="ACPI\AML\" />
+      <ProjectReference Include="..\ACPIAML\ACPIAML.csproj" />
     </ItemGroup>
 
 </Project>

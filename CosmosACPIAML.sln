@@ -5,7 +5,9 @@ VisualStudioVersion = 17.2.32526.322
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CosmosACPIAML", "CosmosACPIAML\CosmosACPIAML.csproj", "{3698F414-C58B-4CF8-8F25-A41EAF01E1D6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "Test\Test.csproj", "{2928D448-5A8E-4C72-B894-C744C4CA6571}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test", "Test\Test.csproj", "{2928D448-5A8E-4C72-B894-C744C4CA6571}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ACPIAML", "ACPIAML\ACPIAML.csproj", "{69955080-BD30-459F-B057-D99406C3FE2B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{2928D448-5A8E-4C72-B894-C744C4CA6571}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2928D448-5A8E-4C72-B894-C744C4CA6571}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2928D448-5A8E-4C72-B894-C744C4CA6571}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69955080-BD30-459F-B057-D99406C3FE2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69955080-BD30-459F-B057-D99406C3FE2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69955080-BD30-459F-B057-D99406C3FE2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69955080-BD30-459F-B057-D99406C3FE2B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
