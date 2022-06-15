@@ -12,7 +12,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="lenovo.aml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="pciIrqDsdt.aml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="QEMU.aml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="randompc.aml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="test.aml">

@@ -83,6 +83,7 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.CharList:
                             case ParseArgFlags.Name:
                             case ParseArgFlags.NameString:
+                            case ParseArgFlags.SuperName:
                                 {
                                     object arg = ParseSimpleArgument(info.ParseArgs[x]);
                                     if (arg != null)
@@ -91,7 +92,6 @@ namespace ACPILibs.Parser2
                                     }
                                 }
                                 break;
-
                             case ParseArgFlags.DataObject:
                             case ParseArgFlags.TermArg:
                                 {
@@ -138,7 +138,7 @@ namespace ACPILibs.Parser2
                                 break;
 
                             default:
-                                Console.WriteLine("psargs.c / line 913 - Unknown arg");
+                                Console.WriteLine("psargs.c / line 913 - Unknown arg: " + info.ParseArgs[x]);
                                 break;
                         }
                     }
@@ -167,31 +167,26 @@ namespace ACPILibs.Parser2
                     op.Nodes.Add(op2);
                 }
             }
+            else if (op.Op.Name == "Method")
+            {
+                //We add one because we expect a DualNamePrefix (0x2E)
+                _source.Seek(op.DataStart + 1, SeekOrigin.Begin);
 
+                //Read until function name string ends
+                while(_source.ReadByte() != 0)
+                {
 
-            //if (op.ConstantValue != null)
-            //{
-            //    Console.WriteLine("Value = " + ValueToString(op.ConstantValue), false);
-            //}
-            //if (op.Arguments.Count != 0)
-            //{
-            //    ACPI.Log("Arguments:");
-            //    foreach (var item in op.Arguments)
-            //    {
-            //        if (item is string s)
-            //        {
-            //            ACPI.Log($" -s {s}");
-            //        }
-            //        else if (item is int i)
-            //        {
-            //            ACPI.Log($" -int {i}");
-            //        }
-            //        else
-            //        {
-            //            ACPI.Log($" -u " + ValueToString(op.ConstantValue));
-            //        }
-            //    }
-            //}
+                }
+
+                var codeBegin = _source.Position;
+                var codeEnd = op.DataStart + op.Length;
+
+                while (_source.Position < codeEnd)
+                {
+                    ParseNode op2 = ParseFullOpCodeNode();
+                    op.Nodes.Add(op2);
+                }
+            }
 
             return op;
         }
@@ -301,6 +296,16 @@ namespace ACPILibs.Parser2
                 case ParseArgFlags.Name:
                 case ParseArgFlags.NameString:
                     return ReadNameString();
+                case ParseArgFlags.SuperName:
+                    {
+                        //var x = 0;
+                        //var off = _source.Position;
+                        //;
+                        //var b = ReadNameString();
+
+                        //todo: implement correctly
+                        return _source.ReadByte();//b;
+                    }
             }
 
             return null;
