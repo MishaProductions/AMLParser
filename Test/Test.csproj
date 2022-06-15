@@ -11,4 +11,16 @@
     <ProjectReference Include="..\ACPIAML\ACPIAML.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="pciIrqDsdt.aml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="test.aml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="test.asl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

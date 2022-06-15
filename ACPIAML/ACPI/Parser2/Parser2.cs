@@ -1,5 +1,4 @@
 ﻿using ACPILibs.AML;
-using Cosmoss.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,167 +6,173 @@ using System.Text;
 
 namespace ACPILibs.Parser2
 {
-	public class Parser
-	{
-		private Stream _source;
+    public class Parser
+    {
+        private Stream _source;
 
-		public Parser(Stream s)
-		{
-			_source = s;
-		}
+        public Parser(Stream s)
+        {
+            _source = s;
+        }
 
-		public ParseNode Parse()
-		{
-			return PreParse();
-		}
+        public ParseNode Parse()
+        {
+            return PreParse();
+        }
 
-		private ParseNode PreParse()
-		{
-			ParseNode root = new ParseNode()
-			{
-				Name = "\\"
-			};
-
-			while (_source.Position < _source.Length)
-			{
-				ParseNode op = ParseFullOpCodeNode();
-				ACPI.Log("Node: " + op.Name);
-				root.Nodes.Add(op);
-			}
-
-			return root;
-		}
-
-		private ParseNode ParseFullOpCodeNode()
-		{
-			//Read the opcode
-			ParseNode op = ReadOpCode();
-			OpCode info = op.Op;
-
-			_source.Seek(op.DataStart, SeekOrigin.Begin);
-
-			//Parse opcode arguments
-			if (info.ParseArgs.Length > 0)
-			{
-				bool parseArguments = false;
-
-				switch (info.Code)
-				{
-					case OpCodeEnum.Byte:
-					case OpCodeEnum.Word:
-					case OpCodeEnum.DWord:
-					case OpCodeEnum.QWord:
-					case OpCodeEnum.String:
-						op.ConstantValue = ParseSimpleArgument(info.ParseArgs[0]);
-						break;
-
-					case OpCodeEnum.NamePath:
-						op.Arguments.Add(ReadNameString());
-						break;
-
-					default:
-						parseArguments = true;
-						break;
-				}
-
-				if (parseArguments) //If the opcode is not a constant
-				{
-					for (int x = 0; x < info.ParseArgs.Length; x++)
-					{
-						switch (info.ParseArgs[x])
-						{
-							case ParseArgFlags.None:
-								break;
-
-							case ParseArgFlags.ByteData:
-							case ParseArgFlags.WordData:
-							case ParseArgFlags.DWordData:
-							case ParseArgFlags.CharList:
-							case ParseArgFlags.Name:
-							case ParseArgFlags.NameString:
-								{
-									object arg = ParseSimpleArgument(info.ParseArgs[x]);
-									if (arg != null)
-									{
-										op.Arguments.Add(arg);
-									}
-								}
-								break;
-
-							case ParseArgFlags.DataObject:
-							case ParseArgFlags.TermArg:
-								{
-									ParseNode arg = ParseFullOpCodeNode();
-
-									op.Arguments.Add(arg);
-								}
-								break;
-
-							case ParseArgFlags.PackageLength:
-								op.Arguments.Add(op.Length = ReadPackageLength());
-								break;
-
-							case ParseArgFlags.FieldList:
-								while (_source.Position < op.End)
-								{
-									op.Arguments.Add(ReadField());
-								}
-								break;
-
-							case ParseArgFlags.ByteList:
-								if (_source.Position < op.End)
-								{
-									op.ConstantValue = ReadBytes((int)(op.End - _source.Position));
-								}
-								break;
-
-							case ParseArgFlags.DataObjectList:
-							case ParseArgFlags.TermList:
-							case ParseArgFlags.ObjectList:
-
-								if (op.Op.Code == OpCodeEnum.Method)
-									_source.Seek(op.End, SeekOrigin.Begin);
-								else
-								{
-									while (_source.Position < op.End)
-									{
-										ParseNode child = ParseFullOpCodeNode();
-
-										op.Nodes.Add(child);
-									}
-								}
-
-								break;
-
-							default:
-								ACPI.Log("psargs.c / line 913 - Unknown arg");
-								break;
-						}
-					}
-				}
-			}
-
-			//Parse the opcode
-			if ((info.Flags & OpCodeFlags.Named) == OpCodeFlags.Named)
-			{
-				for (int x = 0; x < info.ParseArgs.Length; x++)
-				{
-					if (info.ParseArgs[x] == ParseArgFlags.Name)
-					{
-						op.Name = (string)op.Arguments[x];
-						break;
-					}
-				}
-			}
-
-            ACPI.Log("OpCode = " + op.Op.ToString(), false);
-            ACPI.Log("Start = " + op.Start.ToString(), false);
-            ACPI.Log("Length = " + op.Length.ToString(), false);
-            ACPI.Log("End = " + op.End.ToString(), false);
-            if (op.ConstantValue != null)
+        private ParseNode PreParse()
+        {
+            ParseNode root = new ParseNode()
             {
-                ACPI.Log("Value = " + ValueToString(op.ConstantValue), false);
+                Name = "\\"
+            };
+
+            while (_source.Position < _source.Length)
+            {
+                ParseNode op = ParseFullOpCodeNode();
+                root.Nodes.Add(op);
             }
+
+            return root;
+        }
+
+        private ParseNode ParseFullOpCodeNode()
+        {
+            //Read the opcode
+            ParseNode op = ReadOpCode();
+            OpCode info = op.Op;
+
+            _source.Seek(op.DataStart, SeekOrigin.Begin);
+
+            //Parse opcode arguments
+            if (info.ParseArgs.Length > 0)
+            {
+                bool parseArguments = false;
+
+                switch (info.Code)
+                {
+                    case OpCodeEnum.Byte:
+                    case OpCodeEnum.Word:
+                    case OpCodeEnum.DWord:
+                    case OpCodeEnum.QWord:
+                    case OpCodeEnum.String:
+                        op.ConstantValue = ParseSimpleArgument(info.ParseArgs[0]);
+                        break;
+
+                    case OpCodeEnum.NamePath:
+                        op.Arguments.Add(ReadNameString());
+                        break;
+
+                    default:
+                        parseArguments = true;
+                        break;
+                }
+
+                if (parseArguments) //If the opcode is not a constant
+                {
+                    for (int x = 0; x < info.ParseArgs.Length; x++)
+                    {
+                        switch (info.ParseArgs[x])
+                        {
+                            case ParseArgFlags.None:
+                                break;
+
+                            case ParseArgFlags.ByteData:
+                            case ParseArgFlags.WordData:
+                            case ParseArgFlags.DWordData:
+                            case ParseArgFlags.CharList:
+                            case ParseArgFlags.Name:
+                            case ParseArgFlags.NameString:
+                                {
+                                    object arg = ParseSimpleArgument(info.ParseArgs[x]);
+                                    if (arg != null)
+                                    {
+                                        op.Arguments.Add(arg);
+                                    }
+                                }
+                                break;
+
+                            case ParseArgFlags.DataObject:
+                            case ParseArgFlags.TermArg:
+                                {
+                                    ParseNode arg = ParseFullOpCodeNode();
+
+                                    op.Arguments.Add(arg);
+                                }
+                                break;
+
+                            case ParseArgFlags.PackageLength:
+                                op.Arguments.Add(op.Length = ReadPackageLength());
+                                break;
+
+                            case ParseArgFlags.FieldList:
+                                while (_source.Position < op.End)
+                                {
+                                    op.Arguments.Add(ReadField());
+                                }
+                                break;
+
+                            case ParseArgFlags.ByteList:
+                                if (_source.Position < op.End)
+                                {
+                                    op.ConstantValue = ReadBytes((int)(op.End - _source.Position));
+                                }
+                                break;
+
+                            case ParseArgFlags.DataObjectList:
+                            case ParseArgFlags.TermList:
+                            case ParseArgFlags.ObjectList:
+
+                                if (op.Op.Code == OpCodeEnum.Method)
+                                    _source.Seek(op.End, SeekOrigin.Begin);
+                                else
+                                {
+                                    while (_source.Position < op.End)
+                                    {
+                                        ParseNode child = ParseFullOpCodeNode();
+
+                                        op.Nodes.Add(child);
+                                    }
+                                }
+
+                                break;
+
+                            default:
+                                Console.WriteLine("psargs.c / line 913 - Unknown arg");
+                                break;
+                        }
+                    }
+                }
+            }
+
+            //Parse the opcode
+            if ((info.Flags & OpCodeFlags.Named) == OpCodeFlags.Named)
+            {
+                for (int x = 0; x < info.ParseArgs.Length; x++)
+                {
+                    if (info.ParseArgs[x] == ParseArgFlags.Name)
+                    {
+                        op.Name = (string)op.Arguments[x];
+                        break;
+                    }
+                }
+            }
+
+            if (op.Op.Name == "Scope")
+            {
+                var orgPosition = op.DataStart;
+                while (_source.Position < orgPosition+op.Length)
+                {
+                    ParseNode op2 = ParseFullOpCodeNode();
+                    op.Nodes.Add(op2);
+                }
+            }
+
+
+            //if (op.ConstantValue != null)
+            //{
+            //    Console.WriteLine("Value = " + ValueToString(op.ConstantValue), false);
+            //}
             //if (op.Arguments.Count != 0)
             //{
             //    ACPI.Log("Arguments:");
@@ -189,270 +194,235 @@ namespace ACPILibs.Parser2
             //}
 
             return op;
-		}
+        }
 
-		private static string ValueToString(object val)
-		{
-			if (val == null)
-				return "null";
+        private ParseNode ReadField()
+        {
+            OpCodeEnum opCode;
+            switch ((OpCodeEnum)PeekByte())
+            {
+                case OpCodeEnum.FieldOffset:
 
-			if (val is string)
-				return "\"" + val.ToString() + "\"";
+                    opCode = OpCodeEnum.ReservedField; ;
+                    _source.Seek(1, SeekOrigin.Current);
+                    break;
 
-			if (val is byte)
-				return "0x" + ((byte)val).ToString("X2");
+                case OpCodeEnum.FieldAccess:
 
-			if (val is Array)
-			{
-				Array ar = (Array)val;
+                    opCode = OpCodeEnum.AccessField;
+                    _source.Seek(1, SeekOrigin.Current);
+                    break;
 
-				string rt = "";
+                case OpCodeEnum.FieldConnection:
 
-				for (int x = 0; x < ar.Length; x++)
-					rt += ValueToString(ar.GetValue(x)) + (x < ar.Length - 1 ? ", " : string.Empty);
+                    opCode = OpCodeEnum.Connection;
+                    _source.Seek(1, SeekOrigin.Current);
+                    break;
 
-				return rt;
-			}
+                case OpCodeEnum.FieldExternalAccess:
 
-			if (val is ParseNode)
-			{
-				ParseNode node = (ParseNode)val;
+                    opCode = OpCodeEnum.ExternalAccessField;
+                    _source.Seek(1, SeekOrigin.Current);
+                    break;
 
-				if (node.ConstantValue != null)
-					return ValueToString(node.ConstantValue);
-			}
+                default:
+                    opCode = OpCodeEnum.NamedField;
+                    break;
+            }
 
-			return val.ToString();
-		}
+            ParseNode node = new ParseNode()
+            {
+                Op = OpCodeTable.GetOpcode((ushort)opCode)
+            };
 
-		private ParseNode ReadField()
-		{
-			OpCodeEnum opCode;
-			switch ((OpCodeEnum)PeekByte())
-			{
-				case OpCodeEnum.FieldOffset:
+            switch (opCode)
+            {
+                case OpCodeEnum.NamedField:
+                    node.Name = Read4ByteName();
+                    node.ConstantValue = ReadPackageLength();
+                    break;
+                case OpCodeEnum.ReservedField:
+                    node.ConstantValue = ReadPackageLength();
+                    break;
+                case OpCodeEnum.AccessField:
+                    node.ConstantValue = (ReadByte() | ((uint)ReadByte() << 8));
+                    break;
+                case OpCodeEnum.ExternalAccessField:
+                    node.ConstantValue = (ReadByte() | ((uint)ReadByte() << 8) | ((uint)ReadByte() << 16));
+                    break;
 
-					opCode = OpCodeEnum.ReservedField; ;
-					_source.Seek(1, SeekOrigin.Current);
-					break;
+                default:
+                    throw new Exception("psargs.c / line 703");
+            }
 
-				case OpCodeEnum.FieldAccess:
+            return node;
+        }
 
-					opCode = OpCodeEnum.AccessField;
-					_source.Seek(1, SeekOrigin.Current);
-					break;
+        private int ReadPackageLength()
+        {
+            int length = 0;
 
-				case OpCodeEnum.FieldConnection:
+            byte b0 = (byte)_source.ReadByte();
 
-					opCode = OpCodeEnum.Connection;
-					_source.Seek(1, SeekOrigin.Current);
-					break;
+            int byteCount = (b0 >> 6);
 
-				case OpCodeEnum.FieldExternalAccess:
+            byte firstMask = (byte)(byteCount > 0 ? 0x0F : 0x3F);
 
-					opCode = OpCodeEnum.ExternalAccessField;
-					_source.Seek(1, SeekOrigin.Current);
-					break;
+            for (int b = 0; b < byteCount; b++)
+            {
+                length |= ((byte)_source.ReadByte() << ((byteCount << 3) - 4));
+            }
 
-				default:
-					opCode = OpCodeEnum.NamedField;
-					break;
-			}
+            length |= (b0 & firstMask);
 
-			ParseNode node = new ParseNode()
-			{
-				Op = OpCodeTable.GetOpcode((ushort)opCode)
-			};
+            return length;
+        }
 
-			switch (opCode)
-			{
-				case OpCodeEnum.NamedField:
-					node.Name = Read4ByteName();
-					node.ConstantValue = ReadPackageLength();
-					break;
-				case OpCodeEnum.ReservedField:
-					node.ConstantValue = ReadPackageLength();
-					break;
-				case OpCodeEnum.AccessField:
-					node.ConstantValue = (ReadByte() | ((uint)ReadByte() << 8));
-					break;
-				case OpCodeEnum.ExternalAccessField:
-					node.ConstantValue = (ReadByte() | ((uint)ReadByte() << 8) | ((uint)ReadByte() << 16));
-					break;
+        private object ParseSimpleArgument(ParseArgFlags arg)
+        {
+            switch (arg)
+            {
+                case ParseArgFlags.ByteData:
+                    return (byte)_source.ReadByte();
+                case ParseArgFlags.WordData:
+                    return BitConverter.ToInt16(ReadBytes(2), 0);
+                case ParseArgFlags.DWordData:
+                    return BitConverter.ToInt32(ReadBytes(4), 0);
+                case ParseArgFlags.QWordData:
+                    return BitConverter.ToInt64(ReadBytes(8), 0);
+                case ParseArgFlags.CharList: //Nullterminated string
+                    string str = string.Empty;
 
-				default:
-					throw new Exception("psargs.c / line 703");
-			}
+                    byte read;
+                    while ((read = (byte)_source.ReadByte()) != 0)
+                        str += (char)read;
 
-			return node;
-		}
+                    return str;
+                case ParseArgFlags.Name:
+                case ParseArgFlags.NameString:
+                    return ReadNameString();
+            }
 
-		private int ReadPackageLength()
-		{
-			int length = 0;
+            return null;
+        }
 
-			byte b0 = (byte)_source.ReadByte();
+        private string ReadNameString()
+        {
+            //Read past prefix chars
+            while (Definitions.IsNameRootPrefixOrParentPrefix(PeekByte()))
+            {
+                _source.Seek(1, SeekOrigin.Current);
+            }
 
-			int byteCount = (b0 >> 6);
+            int segments = 0;
+            switch (ReadByte())
+            {
+                case 0: //Null string
+                    return string.Empty;
 
-			byte firstMask = (byte)(byteCount > 0 ? 0x0F : 0x3F);
+                case Definitions.DualNamePrefix:
+                    segments = 2;
+                    break;
+                case Definitions.MultiNamePrefix:
+                    segments = ReadByte();
+                    break;
 
-			for (int b = 0; b < byteCount; b++)
-			{
-				length |= ((byte)_source.ReadByte() << ((byteCount << 3) - 4));
-			}
+                default:
+                    segments = 1;
 
-			length |= (b0 & firstMask);
+                    _source.Seek(-1, SeekOrigin.Current);
+                    break;
+            }
 
-			return length;
-		}
+            string name = string.Empty;
 
-		private object ParseSimpleArgument(ParseArgFlags arg)
-		{
-			switch (arg)
-			{
-				case ParseArgFlags.ByteData:
-					return (byte)_source.ReadByte();
-				case ParseArgFlags.WordData:
-					return BitConverter.ToInt16(ReadBytes(2), 0);
-				case ParseArgFlags.DWordData:
-					return BitConverter.ToInt32(ReadBytes(4), 0);
-				case ParseArgFlags.QWordData:
-					return BitConverter.ToInt64(ReadBytes(8), 0);
-				case ParseArgFlags.CharList: //Nullterminated string
-					string str = string.Empty;
+            for (int seg = 0; seg < segments; seg++)
+            {
+                string nameSeg = Read4ByteName();
 
-					byte read;
-					while ((read = (byte)_source.ReadByte()) != 0)
-						str += (char)read;
+                name += nameSeg;
 
-					return str;
-				case ParseArgFlags.Name:
-				case ParseArgFlags.NameString:
-					return ReadNameString();
-			}
+                if (seg < segments - 1)
+                    name += ".";
+            }
 
-			return null;
-		}
+            return name;
+        }
 
-		private string ReadNameString()
-		{
-			//Read past prefix chars
-			while (Definitions.IsNameRootPrefixOrParentPrefix(PeekByte()))
-			{
-				_source.Seek(1, SeekOrigin.Current);
-			}
+        private ParseNode ReadOpCode()
+        {
+            long pos = _source.Position;
 
-			int segments = 0;
-			switch (ReadByte())
-			{
-				case 0: //Null string
-					return string.Empty;
+            ushort op = PeekOpcode();
+            OpCode? info = OpCodeTable.GetOpcode(op);
+            switch (info.Class)
+            {
+                case OpCodeClass.ASCII:
+                case OpCodeClass.Prefix:
+                    info = OpCodeTable.GetOpcode((ushort)OpCodeEnum.NamePath);
+                    pos -= 1; //The op code byte is the data itself
+                    break;
+                case OpCodeClass.ClassUnknown:
+                    Console.WriteLine("Unknown AML opcode: 0x" + op.ToString("X"));
+                    break;
+                default:
+                    _source.Seek(info.CodeByteSize, SeekOrigin.Current);
+                    break;
+            }
 
-				case Definitions.DualNamePrefix:
-					segments = 2;
-					break;
-				case Definitions.MultiNamePrefix:
-					segments = ReadByte();
-					break;
+            return new ParseNode()
+            {
+                Op = info,
+                Start = pos,
+                DataStart = pos + info.CodeByteSize
+            };
+        }
 
-				default:
-					segments = 1;
+        private string Read4ByteName()
+        {
+            byte[] dt = new byte[4];
+            _source.Read(dt, 0, 4);
 
-					_source.Seek(-1, SeekOrigin.Current);
-					break;
-			}
+            return Encoding.ASCII.GetString(dt);
+        }
 
-			string name = string.Empty;
+        private byte[] ReadBytes(int num)
+        {
+            byte[] temp = new byte[num];
+            _source.Read(temp, 0, num);
 
-			for (int seg = 0; seg < segments; seg++)
-			{
-				string nameSeg = Read4ByteName();
+            return temp;
+        }
 
-				name += nameSeg;
+        private byte PeekByte()
+        {
+            byte read = (byte)_source.ReadByte();
 
-				if (seg < segments - 1)
-					name += ".";
-			}
+            _source.Seek(-1, SeekOrigin.Current);
 
-			return name;
-		}
+            return read;
+        }
 
-		private ParseNode ReadOpCode()
-		{
-			long pos = _source.Position;
+        private byte ReadByte()
+        {
+            return (byte)_source.ReadByte();
+        }
 
-			ushort op = PeekOpcode();
-			OpCode info = OpCodeTable.GetOpcode(op);
+        private ushort PeekOpcode()
+        {
+            ushort code = (ushort)_source.ReadByte();
+            if (code == Definitions.ExtendedOpCodePrefix)
+            {
+                code = (ushort)((code << 8) | (ushort)_source.ReadByte());
 
-			switch (info.Class)
-			{
-				case OpCodeClass.ASCII:
-				case OpCodeClass.Prefix:
-					info = OpCodeTable.GetOpcode((ushort)OpCodeEnum.NamePath);
-					pos -= 1; //The op code byte is the data itself
-					break;
-				case OpCodeClass.ClassUnknown:
-					ACPI.Log("Unknown AML opcode: 0x" + op.ToString("X"));
-					break;
-				default:
-					_source.Seek(info.CodeByteSize, SeekOrigin.Current);
-					break;
-			}
+                //_source.Seek(-2, SeekOrigin.Current);
+            }
+            else
+            {
+                //_source.Seek(-1, SeekOrigin.Current);
+            }
 
-			return new ParseNode()
-			{
-				Op = info,
-				Start = pos,
-				DataStart = pos + info.CodeByteSize
-			};
-		}
-
-		private string Read4ByteName()
-		{
-			byte[] dt = new byte[4];
-			_source.Read(dt, 0, 4);
-
-			return Encoding.ASCII.GetString(dt);
-		}
-
-		private byte[] ReadBytes(int num)
-		{
-			byte[] temp = new byte[num];
-			_source.Read(temp, 0, num);
-
-			return temp;
-		}
-
-		private byte PeekByte()
-		{
-			byte read = (byte)_source.ReadByte();
-
-			_source.Seek(-1, SeekOrigin.Current);
-
-			return read;
-		}
-
-		private byte ReadByte()
-		{
-			return (byte)_source.ReadByte();
-		}
-
-		private ushort PeekOpcode()
-		{
-			ushort code = (ushort)_source.ReadByte();
-			if (code == Definitions.ExtendedOpCodePrefix)
-			{
-				code = (ushort)((code << 8) | (ushort)_source.ReadByte());
-
-				_source.Seek(-2, SeekOrigin.Current);
-			}
-			else
-			{
-				_source.Seek(-1, SeekOrigin.Current);
-			}
-
-			return code;
-		}
-	}
+            return code;
+        }
+    }
 }

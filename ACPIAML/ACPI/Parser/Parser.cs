@@ -1,5 +1,4 @@
 ﻿using ACPILibs.AML;
-using Cosmoss.Core;
 using System;
 using System.IO;
 using System.Text;
@@ -464,7 +463,6 @@ namespace ACPILibs.Parser
 						break;
 
 					default:
-						ACPI.Log("unknown opcode");
 						throw new NotImplementedException("Unknown opcode");
 				}
 			}
