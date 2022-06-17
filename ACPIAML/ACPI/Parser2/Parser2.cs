@@ -1,4 +1,5 @@
-﻿using ACPILibs.AML;
+﻿using ACPIAML.Interupter;
+using ACPILibs.AML;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -60,7 +61,7 @@ namespace ACPILibs.Parser2
                         break;
 
                     case OpCodeEnum.NamePath:
-                        op.Arguments.Add(ReadNameString());
+                        op.Arguments.Add(StackObject.Create(ReadNameString()));
                         break;
 
                     default:
@@ -83,9 +84,8 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.CharList:
                             case ParseArgFlags.Name:
                             case ParseArgFlags.NameString:
-                            case ParseArgFlags.SuperName:
                                 {
-                                    object arg = ParseSimpleArgument(info.ParseArgs[x]);
+                                    var arg = ParseSimpleArgument(info.ParseArgs[x]);
                                     if (arg != null)
                                     {
                                         op.Arguments.Add(arg);
@@ -95,27 +95,28 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.DataObject:
                             case ParseArgFlags.TermArg:
                                 {
-                                    ParseNode arg = ParseFullOpCodeNode();
+                                    var arg = ParseFullOpCodeNode(); //parsenode
 
-                                    op.Arguments.Add(arg);
+                                    op.Arguments.Add(StackObject.Create(arg));
                                 }
                                 break;
 
                             case ParseArgFlags.PackageLength:
-                                op.Arguments.Add(op.Length = ReadPackageLength());
+                                var xx = op.Length = ReadPackageLength();
+                                op.Arguments.Add(StackObject.Create(xx));
                                 break;
 
                             case ParseArgFlags.FieldList:
                                 while (_source.Position < op.End)
                                 {
-                                    op.Arguments.Add(ReadField());
+                                    op.Arguments.Add(StackObject.Create(ReadField()));
                                 }
                                 break;
 
                             case ParseArgFlags.ByteList:
                                 if (_source.Position < op.End)
                                 {
-                                    op.ConstantValue = ReadBytes((int)(op.End - _source.Position));
+                                    op.ConstantValue = StackObject.Create(ReadBytes((int)(op.End - _source.Position)));
                                 }
                                 break;
 
@@ -137,6 +138,27 @@ namespace ACPILibs.Parser2
 
                                 break;
 
+                            case ParseArgFlags.Target:
+                            case ParseArgFlags.SuperName:
+                                ushort subOp2 = PeekOpcode();
+                                if (subOp2 == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp2) || Definitions.IsLeadingChar((byte)subOp2))
+                                {
+                                    //AMLOp namePath = new AMLOp(OpCodeTable.GetOpcode((ushort)OpCodeEnum.NamePath), op);
+                                    var xxx = ParseFullOpCodeNode();
+                                    xxx.Name = ReadNameString();
+                                    op.Nodes.Add(xxx);
+
+                                    
+                                }
+                                else
+                                {
+                                    _source.Seek(op.DataStart, SeekOrigin.Begin);
+                                    var xxx = ParseFullOpCodeNode();
+                                    op.Nodes.Add(xxx);
+                                    ;
+                                }
+                                break;
+
                             default:
                                 Console.WriteLine("psargs.c / line 913 - Unknown arg: " + info.ParseArgs[x]);
                                 break;
@@ -152,7 +174,7 @@ namespace ACPILibs.Parser2
                 {
                     if (info.ParseArgs[x] == ParseArgFlags.Name)
                     {
-                        op.Name = (string)op.Arguments[x];
+                        op.Name = (string)op.Arguments[x].Value;
                         break;
                     }
                 }
@@ -234,16 +256,16 @@ namespace ACPILibs.Parser2
             {
                 case OpCodeEnum.NamedField:
                     node.Name = Read4ByteName();
-                    node.ConstantValue = ReadPackageLength();
+                    node.ConstantValue = StackObject.Create(ReadPackageLength());
                     break;
                 case OpCodeEnum.ReservedField:
-                    node.ConstantValue = ReadPackageLength();
+                    node.ConstantValue = StackObject.Create(ReadPackageLength());
                     break;
                 case OpCodeEnum.AccessField:
-                    node.ConstantValue = (ReadByte() | ((uint)ReadByte() << 8));
+                    node.ConstantValue = StackObject.Create((ReadByte() | ((uint)ReadByte() << 8)));
                     break;
                 case OpCodeEnum.ExternalAccessField:
-                    node.ConstantValue = (ReadByte() | ((uint)ReadByte() << 8) | ((uint)ReadByte() << 16));
+                    node.ConstantValue = StackObject.Create((ReadByte() | ((uint)ReadByte() << 8) | ((uint)ReadByte() << 16)));
                     break;
 
                 default:
@@ -273,18 +295,18 @@ namespace ACPILibs.Parser2
             return length;
         }
 
-        private object ParseSimpleArgument(ParseArgFlags arg)
+        private StackObject ParseSimpleArgument(ParseArgFlags arg)
         {
             switch (arg)
             {
                 case ParseArgFlags.ByteData:
-                    return (byte)_source.ReadByte();
+                    return StackObject.Create((byte)_source.ReadByte());
                 case ParseArgFlags.WordData:
-                    return BitConverter.ToInt16(ReadBytes(2), 0);
+                    return StackObject.Create(BitConverter.ToInt16(ReadBytes(2), 0));
                 case ParseArgFlags.DWordData:
-                    return BitConverter.ToInt32(ReadBytes(4), 0);
+                    return StackObject.Create(BitConverter.ToInt32(ReadBytes(4), 0));
                 case ParseArgFlags.QWordData:
-                    return BitConverter.ToInt64(ReadBytes(8), 0);
+                    return StackObject.Create(BitConverter.ToInt64(ReadBytes(8), 0));
                 case ParseArgFlags.CharList: //Nullterminated string
                     string str = string.Empty;
 
@@ -292,20 +314,10 @@ namespace ACPILibs.Parser2
                     while ((read = (byte)_source.ReadByte()) != 0)
                         str += (char)read;
 
-                    return str;
+                    return StackObject.Create(ReadNameString());
                 case ParseArgFlags.Name:
                 case ParseArgFlags.NameString:
-                    return ReadNameString();
-                case ParseArgFlags.SuperName:
-                    {
-                        //var x = 0;
-                        //var off = _source.Position;
-                        //;
-                        //var b = ReadNameString();
-
-                        //todo: implement correctly
-                        return _source.ReadByte();//b;
-                    }
+                    return StackObject.Create(ReadNameString());
             }
 
             return null;

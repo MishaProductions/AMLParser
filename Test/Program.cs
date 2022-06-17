@@ -1,4 +1,5 @@
-﻿using ACPILibs.Parser2;
+﻿using ACPIAML.Interupter;
+using ACPILibs.Parser2;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -46,7 +47,8 @@ namespace CosmosACPIAMl
             Console.WriteLine(spacing + $" - Length: {item.Length}, DataStart: {item.DataStart}, DataEnd: {item.DataStart + item.Length}");
             foreach (var arg in item.Arguments)
             {
-                Console.WriteLine(spacing + " -- Argument: " + ValueToString(arg) + $"({arg.GetType().Name})");
+                var type = arg.Value == null ? "<null>" : arg.Value.GetType().Name;
+                Console.WriteLine(spacing + $" -- Argument: {ValueToString(arg)}, type: {type}");
             }
 
             spacing += "  ";
@@ -55,38 +57,45 @@ namespace CosmosACPIAMl
                 DisplayNode(n, spacing);
             }
         }
-        private static string ValueToString(object val)
+        private static string ValueToString(StackObject val)
         {
-            if (val == null)
-                return "null";
-
-            if (val is string)
-                return "\"" + val.ToString() + "\"";
-
-            if (val is byte)
-                return "0x" + ((byte)val).ToString("X2");
-
-            if (val.GetType().IsArray)
+            if (val.Type != StackObjectType.Null && val.Value == null)
             {
-                Array ar = (Array)val;
-
-                string rt = "";
-
-                for (int x = 0; x < ar.Length; x++)
-                    rt += ValueToString(ar.GetValue(x)) + (x < ar.Length - 1 ? ", " : string.Empty);
-
-                return rt;
+                throw new Exception("Type != Null while value == null");
             }
-
-            if (val is ParseNode)
+            //to make VS happy
+            if (val.Value == null)
             {
-                ParseNode node = (ParseNode)val;
-
-                if (node.ConstantValue != null)
-                    return ValueToString(node.ConstantValue);
+                throw new Exception();
             }
-
-            return val.ToString();
+            switch (val.Type)
+            {
+                case StackObjectType.Null:
+                    return "<null>";
+                case StackObjectType.ParseNode:
+                    var node = (ParseNode)val.Value;
+                    if (node.Op.ToString() == "DWord")
+                    {
+                        return "Node: " + node.Name + ", val: "+EisaId.ToText((long)node.ConstantValue.Value);
+                    }
+                    else
+                    {
+                        return "Node: " + node.Name + ", OP: " + node.Op.ToString();
+                    }
+                case StackObjectType.String:
+                    return (string)val.Value;
+                case StackObjectType.Byte:
+                    return "0x"+((byte)val.Value).ToString("X2");
+                case StackObjectType.Word:
+                    return "0x" + ((short)val.Value).ToString("X2");
+                case StackObjectType.DWord:
+                    return "0x" + ((int)val.Value).ToString("X4");
+                case StackObjectType.QWord:
+                    return "0x" + ((long)val.Value).ToString("X8");
+                default:
+                    break;
+            }
+            return "<unknown>";
         }
         static void ReadHeader()
         {
