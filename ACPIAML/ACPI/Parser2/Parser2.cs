@@ -170,13 +170,13 @@ namespace ACPILibs.Parser2
             else if (op.Op.Name == "Method")
             {
                 //We add one because we expect a DualNamePrefix (0x2E)
-                _source.Seek(op.DataStart + 1, SeekOrigin.Begin);
+                _source.Seek(op.DataStart + 5, SeekOrigin.Begin);
 
-                //Read until function name string ends
-                while(_source.ReadByte() != 0)
-                {
+                ////Read until function name string ends
+                //while(_source.ReadByte() != 0)
+                //{
 
-                }
+                //}
 
                 var codeBegin = _source.Position;
                 var codeEnd = op.DataStart + op.Length;
