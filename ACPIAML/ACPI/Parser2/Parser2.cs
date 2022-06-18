@@ -44,6 +44,7 @@ namespace ACPILibs.Parser2
             OpCode info = op.Op;
 
             _source.Seek(op.DataStart, SeekOrigin.Begin);
+            long methodBodyAddr = 0;
 
             //Parse opcode arguments
             if (info.ParseArgs.Length > 0)
@@ -95,6 +96,8 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.DataObject:
                             case ParseArgFlags.TermArg:
                                 {
+                                    //HACK: todo make this properly
+                                    methodBodyAddr = _source.Position;
                                     var arg = ParseFullOpCodeNode(); //parsenode
 
                                     op.Arguments.Add(StackObject.Create(arg));
@@ -123,24 +126,26 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.DataObjectList:
                             case ParseArgFlags.TermList:
                             case ParseArgFlags.ObjectList:
-
-                                if (op.Op.Code == OpCodeEnum.Method)
-                                    _source.Seek(op.End, SeekOrigin.Begin);
-                                else
+                                var startPosition = _source.Position;
+                                if (op.Arguments[1].Type == StackObjectType.String)
                                 {
-                                    while (_source.Position < op.End)
+                                    if ((string)op.Arguments[1].Value == "CPUS")
                                     {
-                                        ParseNode child = ParseFullOpCodeNode();
-
-                                        op.Nodes.Add(child);
+                                        ;
                                     }
+                                }
+                                while (_source.Position < op.End)
+                                {
+                                    ParseNode child = ParseFullOpCodeNode();
+
+                                    op.Nodes.Add(child);
                                 }
 
                                 break;
 
                             case ParseArgFlags.Target:
                             case ParseArgFlags.SuperName:
-                                ushort subOp2 = PeekOpcode();
+                                ushort subOp2 = PeekUShort();
                                 if (subOp2 == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp2) || Definitions.IsLeadingChar((byte)subOp2))
                                 {
                                     //AMLOp namePath = new AMLOp(OpCodeTable.GetOpcode((ushort)OpCodeEnum.NamePath), op);
@@ -149,7 +154,7 @@ namespace ACPILibs.Parser2
                                     var str = ReadNameString();
                                     op.Arguments.Add(StackObject.Create(str));
 
-                                    
+
                                 }
                                 else
                                 {
@@ -184,31 +189,31 @@ namespace ACPILibs.Parser2
             if (op.Op.Name == "Scope")
             {
                 var orgPosition = op.DataStart;
-                while (_source.Position < orgPosition+op.Length)
+                while (_source.Position < orgPosition + op.Length)
                 {
                     ParseNode op2 = ParseFullOpCodeNode();
                     op.Nodes.Add(op2);
                 }
             }
-            else if (op.Op.Name == "Method")
-            {
-                //We add one because we expect a DualNamePrefix (0x2E)
-                _source.Seek(op.DataStart + 5, SeekOrigin.Begin);
+            //else if (op.Op.Name == "Method")
+            //{
+            //    //We add one because we expect a DualNamePrefix (0x2E)
+            //    _source.Seek(methodBodyAddr, SeekOrigin.Begin);
 
-                ////Read until function name string ends
-                //while(_source.ReadByte() != 0)
-                //{
+            //    ////Read until function name string ends
+            //    //while(_source.ReadByte() != 0)
+            //    //{
 
-                //}
+            //    //}
 
-                var codeEnd = op.DataStart + op.Length;
+            //    var codeEnd = op.DataStart + op.Length;
 
-                while (_source.Position < codeEnd)
-                {
-                    ParseNode op2 = ParseFullOpCodeNode();
-                    op.Nodes.Add(op2);
-                }
-            }
+            //    while (_source.Position < codeEnd)
+            //    {
+            //        ParseNode op2 = ParseFullOpCodeNode();
+            //        op.Nodes.Add(op2);
+            //    }
+            //}
 
             return op;
         }
@@ -332,7 +337,7 @@ namespace ACPILibs.Parser2
                     while ((read = (byte)ReadByte()) != 0)
                         str += (char)read;
 
-                    return StackObject.Create(ReadNameString());
+                    return StackObject.Create(str);
                 case ParseArgFlags.Name:
                 case ParseArgFlags.NameString:
                     return StackObject.Create(ReadNameString());
@@ -352,41 +357,53 @@ namespace ACPILibs.Parser2
             else
             {
                 bool xx = false;
-                while((char)PeekByte() == '^')
+                while ((char)PeekByte() == '^')
                 {
                     xx = true;
                     _source.Position++;
                 }
-                if(xx)
-                b = (char)PeekByte();
+                if (xx)
+                {
+                    b = (char)PeekByte();
+                }
             }
 
             int segmentNumber = 0;
-            var b2 = (char)ReadByte();
-            string o = new(new char[] { b });
-            if (b2 == '\0')
+            bool UseBChar = false;
+            //var b2 = (char)ReadByte();
+            string o = "";
+            if (b == '\0')
             {
                 segmentNumber = 0;
             }
-            else if (b2 == 0x2E)
+            else if (b == 0x2E)
             {
                 //dual prefix
                 segmentNumber = 2;
             }
-            else if (b2 == 0x2F)
+            else if (b == 0x2F)
             {
                 //dual prefix
                 segmentNumber = ReadByte();
             }
             else
             {
-                o += b2.ToString();
-                segmentNumber = 2;
+                segmentNumber = 1; //default?
+                o += b.ToString();
+                UseBChar = true;
             }
-         
-            for (int i = 0; i < segmentNumber; i++)
+            var len = segmentNumber * 4;
+            if (UseBChar)
+                len -= 1;
+            for (int i = 0; i < len; i++)
             {
-                o+=((char)ReadByte()).ToString();
+                o += ((char)ReadByte()).ToString();
+            }
+
+            foreach (var item in o)
+            {
+                if (!char.IsAscii(item))
+                    throw new Exception("Check failed: Char is not ASCII");
             }
             return o;
             ////Read past prefix chars
@@ -435,7 +452,7 @@ namespace ACPILibs.Parser2
         {
             long pos = _source.Position;
 
-            ushort op = PeekOpcode();
+            ushort op = ReadUShort();
             OpCode? info = OpCodeTable.GetOpcode(op);
             switch (info.Class)
             {
@@ -445,7 +462,7 @@ namespace ACPILibs.Parser2
                     pos -= 1; //The op code byte is the data itself
                     break;
                 case OpCodeClass.ClassUnknown:
-                    Console.WriteLine("Unknown AML opcode: 0x" + op.ToString("X") +" at "+_source.Position);
+                    Console.WriteLine("Unknown AML opcode: 0x" + op.ToString("X") + " at " + _source.Position);
                     break;
                 default:
                     _source.Seek(info.CodeByteSize, SeekOrigin.Current);
@@ -485,12 +502,7 @@ namespace ACPILibs.Parser2
             return read;
         }
 
-        private byte ReadByte()
-        {
-            return (byte)_source.ReadByte();
-        }
-
-        private ushort PeekOpcode()
+        private ushort PeekUShort()
         {
             ushort code = (ushort)_source.ReadByte();
             if (code == Definitions.ExtendedOpCodePrefix)
@@ -502,6 +514,22 @@ namespace ACPILibs.Parser2
             else
             {
                 _source.Seek(-1, SeekOrigin.Current);
+            }
+
+            return code;
+        }
+
+        private byte ReadByte()
+        {
+            return (byte)_source.ReadByte();
+        }
+
+        private ushort ReadUShort()
+        {
+            ushort code = (ushort)_source.ReadByte();
+            if (code == Definitions.ExtendedOpCodePrefix)
+            {
+                code = (ushort)((code << 8) | (ushort)_source.ReadByte());
             }
 
             return code;
