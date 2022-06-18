@@ -18,8 +18,9 @@ namespace ACPIAML.Interupter
             var vendor1 = ((vendor_rev >> 10)&0x1f)+64;
             var vendor2 = ((vendor_rev >> 5)&0x1f)+64;
             var vendor3= ((vendor_rev >> 0)&0x1f)+64;
-
-            return "";
+            
+            string vendorStr = new(new char[] { (char)vendor1 , (char)vendor2 , (char)vendor3 });
+            return vendorStr + device1.ToString("X2") + device2.ToString("X2");
         }
     }
 }

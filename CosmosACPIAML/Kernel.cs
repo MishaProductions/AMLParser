@@ -1,5 +1,7 @@
 ﻿using Cosmos.HAL;
 using Cosmos.HAL.Debug;
+using Cosmos.System.Graphics;
+using Cosmos.System.Graphics.Fonts;
 using Cosmoss.Core;
 using System;
 using System.Collections.Generic;

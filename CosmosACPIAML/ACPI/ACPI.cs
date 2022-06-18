@@ -611,7 +611,7 @@ namespace Cosmoss.Core
                     ReadHeader(_reader);
 
                     var dsdtBlock = new MemoryBlock08(dsdtAddress + (uint)sizeof(AcpiHeader), SdtLength - (uint)sizeof(AcpiHeader));
-                    Global.mDebugger.Send(Convert.ToBase64String(dsdtBlock.ToArray()));
+                
                     Stream stream = new MemoryStream(dsdtBlock.ToArray());
 
                     Log("Create parser...");

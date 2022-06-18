@@ -2,6 +2,7 @@
 using ACPILibs.Parser2;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CosmosACPIAMl
@@ -14,14 +15,16 @@ namespace CosmosACPIAMl
         static uint _sdtLength;
         static void Main(string[] args)
         {
-            _sdt = File.OpenRead(@"test.aml");
+            _sdt = File.OpenRead(@"qemu.aml");
             _reader = new BinaryReader(_sdt);
-
+            Stopwatch w = new();
             //STUFF
             {
                 ReadHeader();
-
+             
+                w.Start();
                 var root = new Parser(_sdt).Parse();
+                w.Stop();
                 if (root != null)
                 {
                     foreach (var item in root.Nodes)
@@ -33,7 +36,7 @@ namespace CosmosACPIAMl
 
             _sdt.Close();
 
-            Console.WriteLine("Finished!");
+            Console.WriteLine("Finished! It took "+w.Elapsed.ToString());
             Console.ReadKey();
         }
 
@@ -76,7 +79,7 @@ namespace CosmosACPIAMl
                     var node = (ParseNode)val.Value;
                     if (node.Op.ToString() == "DWord")
                     {
-                        return "Node: " + node.Name + ", val: "+EisaId.ToText((long)node.ConstantValue.Value);
+                        return "Node: " + node.Name + ", val: "+EisaId.ToText((int)node.ConstantValue.Value);
                     }
                     else
                     {

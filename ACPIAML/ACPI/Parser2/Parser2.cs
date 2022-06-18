@@ -144,9 +144,10 @@ namespace ACPILibs.Parser2
                                 if (subOp2 == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp2) || Definitions.IsLeadingChar((byte)subOp2))
                                 {
                                     //AMLOp namePath = new AMLOp(OpCodeTable.GetOpcode((ushort)OpCodeEnum.NamePath), op);
-                                    var xxx = ParseFullOpCodeNode();
-                                    xxx.Name = ReadNameString();
-                                    op.Nodes.Add(xxx);
+                                    // var xxx = ParseFullOpCodeNode();
+                                    //xxx.Name =;
+                                    var str = ReadNameString();
+                                    op.Arguments.Add(StackObject.Create(str));
 
                                     
                                 }
@@ -200,7 +201,6 @@ namespace ACPILibs.Parser2
 
                 //}
 
-                var codeBegin = _source.Position;
                 var codeEnd = op.DataStart + op.Length;
 
                 while (_source.Position < codeEnd)
@@ -277,20 +277,30 @@ namespace ACPILibs.Parser2
 
         private int ReadPackageLength()
         {
-            int length = 0;
+            int length;
 
-            byte b0 = (byte)_source.ReadByte();
+            byte b0 = (byte)ReadByte();
 
-            int byteCount = (b0 >> 6);
+            byte sz = (byte)((b0 >> 6) & 3);
 
-            byte firstMask = (byte)(byteCount > 0 ? 0x0F : 0x3F);
-
-            for (int b = 0; b < byteCount; b++)
+            if (sz == 0)
             {
-                length |= ((byte)_source.ReadByte() << ((byteCount << 3) - 4));
-            }
+                //out = (size_t)(code[*pc] & 0x3F);
+                //(*pc)++;
+                //return 0;
 
-            length |= (b0 & firstMask);
+                length = b0 & 0x3F;
+            }
+            else if (sz == 1)
+            {
+                // *out = (size_t)(code[*pc] & 0x0F) | (size_t)(code[*pc + 1] << 4);
+
+                length = ((b0 & 0x0F) | ReadByte() << 4);
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
 
             return length;
         }
@@ -300,7 +310,7 @@ namespace ACPILibs.Parser2
             switch (arg)
             {
                 case ParseArgFlags.ByteData:
-                    return StackObject.Create((byte)_source.ReadByte());
+                    return StackObject.Create((byte)ReadByte());
                 case ParseArgFlags.WordData:
                     return StackObject.Create(BitConverter.ToInt16(ReadBytes(2), 0));
                 case ParseArgFlags.DWordData:
@@ -311,7 +321,7 @@ namespace ACPILibs.Parser2
                     string str = string.Empty;
 
                     byte read;
-                    while ((read = (byte)_source.ReadByte()) != 0)
+                    while ((read = (byte)ReadByte()) != 0)
                         str += (char)read;
 
                     return StackObject.Create(ReadNameString());
@@ -322,48 +332,95 @@ namespace ACPILibs.Parser2
 
             return null;
         }
-
         private string ReadNameString()
         {
-            //Read past prefix chars
-            while (Definitions.IsNameRootPrefixOrParentPrefix(PeekByte()))
+            var x = _source.Position;
+            var b = (char)ReadByte();
+            bool is_absolute = false;
+            if (b == '\\')
             {
-                _source.Seek(1, SeekOrigin.Current);
+                is_absolute = true;
+            }
+            else
+            {
+                bool xx = false;
+                while((char)PeekByte() == '^')
+                {
+                    xx = true;
+                    _source.Position++;
+                }
+                if(xx)
+                b = (char)PeekByte();
             }
 
-            int segments = 0;
-            switch (ReadByte())
+            int segmentNumber = 0;
+            var b2 = (char)ReadByte();
+            string o = new(new char[] { b });
+            if (b2 == '\0')
             {
-                case 0: //Null string
-                    return string.Empty;
-
-                case Definitions.DualNamePrefix:
-                    segments = 2;
-                    break;
-                case Definitions.MultiNamePrefix:
-                    segments = ReadByte();
-                    break;
-
-                default:
-                    segments = 1;
-
-                    _source.Seek(-1, SeekOrigin.Current);
-                    break;
+                segmentNumber = 0;
             }
-
-            string name = string.Empty;
-
-            for (int seg = 0; seg < segments; seg++)
+            else if (b2 == 0x2E)
             {
-                string nameSeg = Read4ByteName();
-
-                name += nameSeg;
-
-                if (seg < segments - 1)
-                    name += ".";
+                //dual prefix
+                segmentNumber = 2;
             }
+            else if (b2 == 0x2F)
+            {
+                //dual prefix
+                segmentNumber = ReadByte();
+            }
+            else
+            {
+                o += b2.ToString();
+                segmentNumber = 2;
+            }
+         
+            for (int i = 0; i < segmentNumber; i++)
+            {
+                o+=((char)ReadByte()).ToString();
+            }
+            return o;
+            ////Read past prefix chars
+            //while (Definitions.IsNameRootPrefixOrParentPrefix(PeekByte()))
+            //{
+            //    _source.Seek(1, SeekOrigin.Current);
+            //}
 
-            return name;
+            //int segments = 0;
+            //var b = ReadByte();
+            //switch (b)
+            //{
+            //    case 0: //Null string
+            //        return string.Empty;
+
+            //    case Definitions.DualNamePrefix:
+            //        segments = 2;
+            //        break;
+            //    case Definitions.MultiNamePrefix:
+            //        segments = ReadByte();
+            //        break;
+
+            //    default:
+            //        segments = 1;
+
+            //        _source.Seek(-1, SeekOrigin.Current);
+            //        break;
+            //}
+
+            //string name = string.Empty;
+
+            //for (int seg = 0; seg < segments; seg++)
+            //{
+            //    string nameSeg = Read4ByteName();
+
+            //    name += nameSeg;
+
+            //    if (seg < segments - 1)
+            //        name += ".";
+            //}
+
+            //return name;
         }
 
         private ParseNode ReadOpCode()
@@ -432,11 +489,11 @@ namespace ACPILibs.Parser2
             {
                 code = (ushort)((code << 8) | (ushort)_source.ReadByte());
 
-                //_source.Seek(-2, SeekOrigin.Current);
+                _source.Seek(-2, SeekOrigin.Current);
             }
             else
             {
-                //_source.Seek(-1, SeekOrigin.Current);
+                _source.Seek(-1, SeekOrigin.Current);
             }
 
             return code;
