@@ -297,6 +297,14 @@ namespace ACPILibs.Parser2
 
                 length = ((b0 & 0x0F) | ReadByte() << 4);
             }
+            else if (sz == 2)
+            {
+                length = ((b0 & 0x0F) | ReadByte() << 4) | (ReadByte() << 12);
+            }
+            else if (sz == 3)
+            {
+                length = ((b0 & 0x0F) | ReadByte() << 4) | (ReadByte() << 12) | (ReadByte() << 20);
+            }
             else
             {
                 throw new NotImplementedException();
@@ -437,7 +445,7 @@ namespace ACPILibs.Parser2
                     pos -= 1; //The op code byte is the data itself
                     break;
                 case OpCodeClass.ClassUnknown:
-                    Console.WriteLine("Unknown AML opcode: 0x" + op.ToString("X"));
+                    Console.WriteLine("Unknown AML opcode: 0x" + op.ToString("X") +" at "+_source.Position);
                     break;
                 default:
                     _source.Seek(info.CodeByteSize, SeekOrigin.Current);
