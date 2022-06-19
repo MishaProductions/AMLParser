@@ -127,13 +127,17 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.TermList:
                             case ParseArgFlags.ObjectList:
                                 var startPosition = _source.Position;
-                                if (op.Arguments[1].Type == StackObjectType.String)
+                                if (op.Arguments.Count > 2)
                                 {
-                                    if ((string)op.Arguments[1].Value == "CPUS")
+                                    if (op.Arguments[1].Type == StackObjectType.String)
                                     {
-                                        ;
+                                        if ((string)op.Arguments[1].Value == "_OSC")
+                                        {
+                                            ;
+                                        }
                                     }
                                 }
+                          
                                 while (_source.Position < op.End)
                                 {
                                     ParseNode child = ParseFullOpCodeNode();
@@ -195,25 +199,6 @@ namespace ACPILibs.Parser2
                     op.Nodes.Add(op2);
                 }
             }
-            //else if (op.Op.Name == "Method")
-            //{
-            //    //We add one because we expect a DualNamePrefix (0x2E)
-            //    _source.Seek(methodBodyAddr, SeekOrigin.Begin);
-
-            //    ////Read until function name string ends
-            //    //while(_source.ReadByte() != 0)
-            //    //{
-
-            //    //}
-
-            //    var codeEnd = op.DataStart + op.Length;
-
-            //    while (_source.Position < codeEnd)
-            //    {
-            //        ParseNode op2 = ParseFullOpCodeNode();
-            //        op.Nodes.Add(op2);
-            //    }
-            //}
 
             return op;
         }
@@ -290,16 +275,10 @@ namespace ACPILibs.Parser2
 
             if (sz == 0)
             {
-                //out = (size_t)(code[*pc] & 0x3F);
-                //(*pc)++;
-                //return 0;
-
                 length = b0 & 0x3F;
             }
             else if (sz == 1)
             {
-                // *out = (size_t)(code[*pc] & 0x0F) | (size_t)(code[*pc + 1] << 4);
-
                 length = ((b0 & 0x0F) | ReadByte() << 4);
             }
             else if (sz == 2)
@@ -318,7 +297,7 @@ namespace ACPILibs.Parser2
             return length;
         }
 
-        private StackObject ParseSimpleArgument(ParseArgFlags arg)
+        private StackObject? ParseSimpleArgument(ParseArgFlags arg)
         {
             switch (arg)
             {
@@ -347,31 +326,27 @@ namespace ACPILibs.Parser2
         }
         private string ReadNameString()
         {
-            var x = _source.Position;
+            var x = _source.Position; //for debugging
             var b = (char)ReadByte();
             bool is_absolute = false;
+            int height = 0;
             if (b == '\\')
             {
                 is_absolute = true;
+
+                //todo: is this correct? this isn't in LAI
+                b = (char)ReadByte();
             }
             else
             {
-                bool xx = false;
-                while ((char)PeekByte() == '^')
+                while (b == '^')
                 {
-                    xx = true;
-                    _source.Position++;
-                }
-                if (xx)
-                {
-                    b = (char)PeekByte();
+                    b = (char)ReadByte();
+                    height++;
                 }
             }
 
-            int segmentNumber = 0;
-            bool UseBChar = false;
-            //var b2 = (char)ReadByte();
-            string o = "";
+            int segmentNumber;
             if (b == '\0')
             {
                 segmentNumber = 0;
@@ -389,63 +364,57 @@ namespace ACPILibs.Parser2
             else
             {
                 segmentNumber = 1; //default?
-                o += b.ToString();
-                UseBChar = true;
+                _source.Position--;
             }
-            var len = segmentNumber * 4;
-            if (UseBChar)
-                len -= 1;
-            for (int i = 0; i < len; i++)
+            var oldSegNum = segmentNumber;
+            segmentNumber = (((int)_source.Position + 4 * oldSegNum) - (int) _source.Position) / 4;
+            
+           var end = _source.Position + 4 * segmentNumber;
+
+            var MaxLen = 1 //Leading \ for absolute paths.
+                + height // Leading ^ characters
+                + segmentNumber * 5 //Segments, seperated by dots.
+                + 1; //Null-terminator
+
+            string o = "";
+            if (is_absolute)
             {
-                o += ((char)ReadByte()).ToString();
+                o += "\\";
             }
 
-            foreach (var item in o)
+            for (int i = 0; i < height; i++)
             {
-                if (!char.IsAscii(item))
-                    throw new Exception("Check failed: Char is not ASCII");
+                o += "^";
             }
+
+            if (_source.Position != end)
+            {
+                for(; ; )
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var c = (char)ReadByte();
+                        if (c == '\0')
+                        {
+                            //Some 1-byte strings end with a null byte
+                            return o;
+                        }
+                        o += c;
+                        if (!char.IsAscii(c))
+                            throw new Exception("Expected ASCII character");
+
+
+                    }
+                    if (_source.Position == end)
+                    {
+                        break;
+                    }
+                    o += ".";
+                }
+            }
+
+
             return o;
-            ////Read past prefix chars
-            //while (Definitions.IsNameRootPrefixOrParentPrefix(PeekByte()))
-            //{
-            //    _source.Seek(1, SeekOrigin.Current);
-            //}
-
-            //int segments = 0;
-            //var b = ReadByte();
-            //switch (b)
-            //{
-            //    case 0: //Null string
-            //        return string.Empty;
-
-            //    case Definitions.DualNamePrefix:
-            //        segments = 2;
-            //        break;
-            //    case Definitions.MultiNamePrefix:
-            //        segments = ReadByte();
-            //        break;
-
-            //    default:
-            //        segments = 1;
-
-            //        _source.Seek(-1, SeekOrigin.Current);
-            //        break;
-            //}
-
-            //string name = string.Empty;
-
-            //for (int seg = 0; seg < segments; seg++)
-            //{
-            //    string nameSeg = Read4ByteName();
-
-            //    name += nameSeg;
-
-            //    if (seg < segments - 1)
-            //        name += ".";
-            //}
-
-            //return name;
         }
 
         private ParseNode ReadOpCode()

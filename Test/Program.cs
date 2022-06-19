@@ -15,7 +15,11 @@ namespace CosmosACPIAMl
         static uint _sdtLength;
         static void Main(string[] args)
         {
-            _sdt = File.OpenRead(@"qemu.aml");
+            //lenovo.aml: Taken from a Lenovo Yoga 20C0
+            //test.aml: Simple aml code
+            //qemu.aml: taken from qemu
+
+            _sdt = File.OpenRead(@"test.aml");
             _reader = new BinaryReader(_sdt);
             Stopwatch w = new();
             //STUFF

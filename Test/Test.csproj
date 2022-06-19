@@ -21,9 +21,6 @@
     <None Update="QEMU.aml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="randompc.aml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="test.aml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
