@@ -136,12 +136,11 @@ namespace ACPILibs.Parser2
 
                             case ParseArgFlags.Target:
                             case ParseArgFlags.SuperName:
+                            case ParseArgFlags.SimpleName:
+                            case ParseArgFlags.NameOrReference:
                                 ushort subOp2 = PeekUShort();
                                 if (subOp2 == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp2) || Definitions.IsLeadingChar((byte)subOp2))
                                 {
-                                    //AMLOp namePath = new AMLOp(OpCodeTable.GetOpcode((ushort)OpCodeEnum.NamePath), op);
-                                    // var xxx = ParseFullOpCodeNode();
-                                    //xxx.Name =;
                                     var str = ReadNameString();
                                     op.Arguments.Add(StackObject.Create(str));
 
@@ -152,7 +151,6 @@ namespace ACPILibs.Parser2
                                     _source.Seek(op.DataStart, SeekOrigin.Begin);
                                     var xxx = ParseFullOpCodeNode();
                                     op.Nodes.Add(xxx);
-                                    ;
                                 }
                                 break;
 

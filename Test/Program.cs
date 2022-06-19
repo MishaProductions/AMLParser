@@ -19,7 +19,7 @@ namespace CosmosACPIAMl
             //test.aml: Simple aml code
             //qemu.aml: taken from qemu
 
-            _sdt = File.OpenRead(@"test.aml");
+            _sdt = File.OpenRead(@"lenovo.aml");
             _reader = new BinaryReader(_sdt);
             Stopwatch w = new();
             //STUFF
