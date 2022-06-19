@@ -9,8 +9,8 @@ namespace CosmosACPIAMl
 {
     public class Program
     {
-        static FileStream _sdt;
-        static BinaryReader _reader;
+        static FileStream? _sdt;
+        static BinaryReader? _reader;
 
         static uint _sdtLength;
         static void Main(string[] args)
@@ -83,6 +83,10 @@ namespace CosmosACPIAMl
                     var node = (ParseNode)val.Value;
                     if (node.Op.ToString() == "DWord")
                     {
+                        if (node.ConstantValue == null)
+                            throw new Exception("Constant value should not be null");
+                        if (node.ConstantValue.Value == null)
+                            throw new Exception("Constant value should not be null");
                         return "Node: " + node.Name + ", val: "+EisaId.ToText((int)node.ConstantValue.Value);
                     }
                     else
@@ -106,6 +110,8 @@ namespace CosmosACPIAMl
         }
         static void ReadHeader()
         {
+            if (_reader == null)
+                throw new("reader should not be null");
             Console.WriteLine("SDT header:");
 
             //Signature

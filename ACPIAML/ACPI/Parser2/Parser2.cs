@@ -9,7 +9,7 @@ namespace ACPILibs.Parser2
 {
     public class Parser
     {
-        private Stream _source;
+        private readonly Stream _source;
 
         public Parser(Stream s)
         {
@@ -23,7 +23,7 @@ namespace ACPILibs.Parser2
 
         private ParseNode PreParse()
         {
-            ParseNode root = new ParseNode()
+            ParseNode root = new()
             {
                 Name = "\\"
             };
@@ -44,7 +44,6 @@ namespace ACPILibs.Parser2
             OpCode info = op.Op;
 
             _source.Seek(op.DataStart, SeekOrigin.Begin);
-            long methodBodyAddr = 0;
 
             //Parse opcode arguments
             if (info.ParseArgs.Length > 0)
@@ -96,8 +95,6 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.DataObject:
                             case ParseArgFlags.TermArg:
                                 {
-                                    //HACK: todo make this properly
-                                    methodBodyAddr = _source.Position;
                                     var arg = ParseFullOpCodeNode(); //parsenode
 
                                     op.Arguments.Add(StackObject.Create(arg));
@@ -126,17 +123,7 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.DataObjectList:
                             case ParseArgFlags.TermList:
                             case ParseArgFlags.ObjectList:
-                                var startPosition = _source.Position;
-                                if (op.Arguments.Count > 2)
-                                {
-                                    if (op.Arguments[1].Type == StackObjectType.String)
-                                    {
-                                        if ((string)op.Arguments[1].Value == "_OSC")
-                                        {
-                                            ;
-                                        }
-                                    }
-                                }
+                                //var startPosition = _source.Position;
                           
                                 while (_source.Position < op.End)
                                 {
@@ -184,7 +171,12 @@ namespace ACPILibs.Parser2
                 {
                     if (info.ParseArgs[x] == ParseArgFlags.Name)
                     {
-                        op.Name = (string)op.Arguments[x].Value;
+                        var name = op.Arguments[x].Value;
+                        if (name == null)
+                        {
+                            throw new("Name should not be null");
+                        }
+                        op.Name = (string)name;
                         break;
                     }
                 }
@@ -237,7 +229,7 @@ namespace ACPILibs.Parser2
                     break;
             }
 
-            ParseNode node = new ParseNode()
+            ParseNode node = new()
             {
                 Op = OpCodeTable.GetOpcode((ushort)opCode)
             };
@@ -371,10 +363,10 @@ namespace ACPILibs.Parser2
             
            var end = _source.Position + 4 * segmentNumber;
 
-            var MaxLen = 1 //Leading \ for absolute paths.
-                + height // Leading ^ characters
-                + segmentNumber * 5 //Segments, seperated by dots.
-                + 1; //Null-terminator
+            //var MaxLen = 1 //Leading \ for absolute paths.
+            //    + height // Leading ^ characters
+            //    + segmentNumber * 5 //Segments, seperated by dots.
+            //    + 1; //Null-terminator
 
             string o = "";
             if (is_absolute)
