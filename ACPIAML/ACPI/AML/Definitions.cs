@@ -18,5 +18,18 @@
 		{
 			return (b == '_' || (b >= 'A' && b <= 'Z'));
 		}
+
+		public static bool IsName(byte character)
+        {
+			if ((character >= '0' && character <= '9') || (character >= 'A' && character <= 'Z')
+	|| character == '_' || character == 0x5C || character == 0x5E
+	|| character == 0x2F || character == 0x2E)
+            {
+				return true;
+			}
+
+			else
+				return false;
+		}
 	}
 }

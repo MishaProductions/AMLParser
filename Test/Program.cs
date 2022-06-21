@@ -1,4 +1,5 @@
-﻿using ACPIAML.Interupter;
+﻿using ACPIAML.ACPI.Interupter;
+using ACPIAML.Interupter;
 using ACPILibs.Parser2;
 using System;
 using System.Collections.Generic;
@@ -19,7 +20,7 @@ namespace CosmosACPIAMl
             //test.aml: Simple aml code
             //qemu.aml: taken from qemu
 
-            _sdt = File.OpenRead(@"lenovo.aml");
+            _sdt = File.OpenRead(@"qemu.aml");
             _reader = new BinaryReader(_sdt);
             Stopwatch w = new();
             //STUFF
@@ -27,21 +28,29 @@ namespace CosmosACPIAMl
                 ReadHeader();
              
                 w.Start();
-                var root = new Parser(_sdt).Parse();
+                var dsdt = new Parser(_sdt);
+                var root = dsdt.Parse();
                 w.Stop();
-                if (root != null)
-                {
-                    foreach (var item in root.Nodes)
-                    {
-                        DisplayNode(item, " ");
-                    }
-                }
+                //if (root != null)
+                //{
+                //    foreach (var item in root.Nodes)
+                //    {
+                //        DisplayNode(item, " ");
+                //    }
+                //}
+                Console.WriteLine("Running interupter");
+                _sdt = File.OpenRead(@"lenovo.aml");
+                _reader = new BinaryReader(_sdt);
+                _reader.ReadBytes(36);
+                Interupter i = new();
+                i.AddTable(new Parser(_sdt));
+                i.Start();
+                
             }
 
             _sdt.Close();
 
             Console.WriteLine("Finished! It took "+w.Elapsed.ToString());
-            Console.ReadKey();
         }
 
         private static void DisplayNode(ParseNode item, string spacing)

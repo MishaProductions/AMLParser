@@ -23,24 +23,24 @@ namespace ACPILibs.Parser2
 
         private ParseNode PreParse()
         {
-            ParseNode root = new()
+            ParseNode root = new(null)
             {
                 Name = "\\"
             };
 
             while (_source.Position < _source.Length)
             {
-                ParseNode op = ParseFullOpCodeNode();
+                ParseNode op = ParseFullOpCodeNode(root);
                 root.Nodes.Add(op);
             }
 
             return root;
         }
 
-        private ParseNode ParseFullOpCodeNode()
+        private ParseNode ParseFullOpCodeNode(ParseNode parent)
         {
             //Read the opcode
-            ParseNode op = ReadOpCode();
+            ParseNode op = ReadOpCode(parent);
             OpCode info = op.Op;
 
             _source.Seek(op.DataStart, SeekOrigin.Begin);
@@ -95,7 +95,7 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.DataObject:
                             case ParseArgFlags.TermArg:
                                 {
-                                    var arg = ParseFullOpCodeNode(); //parsenode
+                                    var arg = ParseFullOpCodeNode(parent); //parsenode
 
                                     op.Arguments.Add(StackObject.Create(arg));
                                 }
@@ -109,7 +109,7 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.FieldList:
                                 while (_source.Position < op.End)
                                 {
-                                    op.Arguments.Add(StackObject.Create(ReadField()));
+                                    op.Arguments.Add(StackObject.Create(ReadField(op)));
                                 }
                                 break;
 
@@ -127,8 +127,7 @@ namespace ACPILibs.Parser2
                           
                                 while (_source.Position < op.End)
                                 {
-                                    ParseNode child = ParseFullOpCodeNode();
-
+                                    ParseNode child = ParseFullOpCodeNode(op);
                                     op.Nodes.Add(child);
                                 }
 
@@ -149,7 +148,7 @@ namespace ACPILibs.Parser2
                                 else
                                 {
                                     _source.Seek(op.DataStart, SeekOrigin.Begin);
-                                    var xxx = ParseFullOpCodeNode();
+                                    var xxx = ParseFullOpCodeNode(op);
                                     op.Nodes.Add(xxx);
                                 }
                                 break;
@@ -185,7 +184,7 @@ namespace ACPILibs.Parser2
                 var orgPosition = op.DataStart;
                 while (_source.Position < orgPosition + op.Length)
                 {
-                    ParseNode op2 = ParseFullOpCodeNode();
+                    ParseNode op2 = ParseFullOpCodeNode(op);
                     op.Nodes.Add(op2);
                 }
             }
@@ -193,7 +192,7 @@ namespace ACPILibs.Parser2
             return op;
         }
 
-        private ParseNode ReadField()
+        private ParseNode ReadField(ParseNode parent)
         {
             OpCodeEnum opCode;
             switch ((OpCodeEnum)PeekByte())
@@ -227,7 +226,7 @@ namespace ACPILibs.Parser2
                     break;
             }
 
-            ParseNode node = new()
+            ParseNode node = new(parent)
             {
                 Op = OpCodeTable.GetOpcode((ushort)opCode)
             };
@@ -407,7 +406,7 @@ namespace ACPILibs.Parser2
             return o;
         }
 
-        private ParseNode ReadOpCode()
+        private ParseNode ReadOpCode(ParseNode parent)
         {
             long pos = _source.Position;
 
@@ -428,7 +427,7 @@ namespace ACPILibs.Parser2
                     break;
             }
 
-            return new ParseNode()
+            return new ParseNode(parent)
             {
                 Op = info,
                 Start = pos,

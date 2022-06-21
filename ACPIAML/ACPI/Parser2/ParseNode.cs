@@ -22,8 +22,16 @@ namespace ACPILibs.Parser2
 		public List<StackObject> Arguments = new List<StackObject>();
 		public List<ParseNode> Nodes = new List<ParseNode>();
 
+		public ParseNode Parent;
+
+		public ParseNode(ParseNode parent)
+        {
+			Parent = parent;
+		}
 		public override string ToString()
 		{
+			if (Name != null)
+				return Name;
 			return Op.ToString();
 		}
 	}
