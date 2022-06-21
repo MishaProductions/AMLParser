@@ -22,7 +22,7 @@ namespace ACPIAML.ACPI.Interupter
             //RootNode.Nodes.Add(new ParseNode(RootNode) { Name = "_TZ_" });
 
             //OS specific
-            RootNode.Nodes.Add(new ParseNode(RootNode) { Name = "_OSI" });
+            RootNode.Nodes.Add(new ParseNode(RootNode) { Name = "_OSI", Override = OSIOverride });
             RootNode.Nodes.Add(new ParseNode(RootNode) { Name = "_OS_" });
             RootNode.Nodes.Add(new ParseNode(RootNode) { Name = "_REV" });
 
@@ -33,6 +33,12 @@ namespace ACPIAML.ACPI.Interupter
                 throw new Exception("self test failed");
             }
         }
+
+        private StackObject OSIOverride(StackObject[] args)
+        {
+            throw new NotImplementedException();
+        }
+
         public void AddTable(Parser t)
         {
             var v = t.Parse();
@@ -57,28 +63,62 @@ namespace ACPIAML.ACPI.Interupter
         }
         public void Start()
         {
-            /* first run \._SB_._INI */
-            var x = ResolvePath(RootNode, "\\_SB_._INI");
-            if (x != null)
+            //first run \._SB_._INI
+            var handle = ResolvePath(RootNode, "\\_SB_._INI");
+            if (handle != null)
             {
-                Execute(x, new());
+                Execute(handle, new());
+            }
+            else
+            {
+                Console.WriteLine("warn: unable to find \\_SB_\\_INI");
             }
 
+            handle = ResolvePath(RootNode, "\\_SB_");
+            if (handle == null)
+            {
+                throw new Exception("_SB_ should exist.");
+            }
+            //_STA/_INI for all devices
+            InitChildren(handle);
 
-            //var allNodes = GetAllNodes(RootNode);
-            //foreach (var item in allNodes)
-            //{
-            //    if(item.Op != null)
-            //    {
-            //        if (item.Op.Name == "Device")
-            //        {
-            //            if (item.Parent == null)
-            //                throw new NullReferenceException();
+            //tell the firmware about the IRQ mode
+            handle = ResolvePath(RootNode, "\\_PIC");
+            if (handle != null)
+            {
+                Execute(handle, new());
+            }
+            else
+            {
+                Console.WriteLine("warn: unable to find \\_PIC");
+            }
+        }
 
+        private void InitChildren(ParseNode handle)
+        {
+            foreach (var item in handle.Nodes)
+            {
+                if (item.Op.Name == "Device")
+                {
+                    var sta = EvalSTA(item);
+                }
+            }
+        }
+        private ulong EvalSTA(ParseNode node)
+        {
+            // If _STA not present, assume 0x0F as ACPI spec says.
+            ulong STA = 0x0F;
 
-            //        }
-            //    }
-            //}
+            var handle = ResolvePath(node, "_STA");
+            if (handle != null)
+            {
+                var r= Execute(handle, new MethodState());
+                if (r == null) throw new Exception("_STA returned null");
+                if (r.Type != StackObjectType.DWord) throw new Exception("_STA returned invaild type");
+                STA = (ulong)r.Value;
+            }
+
+            return STA;
         }
 
         private StackObject Execute(ParseNode method, MethodState state)
@@ -121,8 +161,12 @@ namespace ACPIAML.ACPI.Interupter
                         }
                     }
 
-                    var x = (ParseNode)currentOp.Arguments[1].Value;
-                    var val = Execute(x, state);
+                    var x = currentOp.Arguments[1].Value;
+                    if (x is string s)
+                    {
+                        x = ResolvePath(RootNode, s);
+                    }
+                    var val = Execute((ParseNode)x, state);
                     if ((bool)val.Value == true)
                     {
                         return Execute(currentOp, state);
@@ -137,7 +181,7 @@ namespace ACPIAML.ACPI.Interupter
                 }
                 else if (currentOp.Op.Name == "Return")
                 {
-                    if (currentOp.Arguments.Count > 0)
+                    if (currentOp.Arguments.Length > 0)
                     {
                         return currentOp.Arguments[0];
                     }
@@ -145,6 +189,10 @@ namespace ACPIAML.ACPI.Interupter
                     {
                         return null;
                     }
+                }
+                else if (currentOp.Op.Name == "Store")
+                {
+                    ;
                 }
                 else
                 {
@@ -163,7 +211,7 @@ namespace ACPIAML.ACPI.Interupter
             if (method.Op.Name == "ConditionalReferenceOf")
             {
                 var obj = (string)method.Arguments[0].Value;
-                var outRegister = method.Nodes[0].Op.Name;
+                var outRegister = ((ParseNode)method.Arguments[1].Value).Op.Name;
 
                 var o = ResolvePath(RootNode, obj);
                 if (o == null)
@@ -186,6 +234,7 @@ namespace ACPIAML.ACPI.Interupter
         {
             var pathIdx = 0;
             var ptr = node;
+            bool startswithSlash = path.StartsWith("\\");
 
             if (path == "\\")
             {
@@ -239,8 +288,11 @@ namespace ACPIAML.ACPI.Interupter
                     {
                         break;
                     }
-                    pathIdx++;
+                    if (!startswithSlash) { startswithSlash = true; }
+                    else { pathIdx++; }
                     segment[k] = path[pathIdx];
+                  
+                  
                 }
 
                 // ACPI pads names with trailing underscores.

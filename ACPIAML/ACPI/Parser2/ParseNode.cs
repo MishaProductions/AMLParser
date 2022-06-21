@@ -19,10 +19,12 @@ namespace ACPILibs.Parser2
 		}
 
 		public StackObject? ConstantValue;
-		public List<StackObject> Arguments = new List<StackObject>();
+		public StackObject[] Arguments;
 		public List<ParseNode> Nodes = new List<ParseNode>();
 
 		public ParseNode Parent;
+		public InternalMethod Override;
+		public delegate StackObject InternalMethod(StackObject[] args);
 
 		public ParseNode(ParseNode parent)
         {

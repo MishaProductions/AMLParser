@@ -26,21 +26,21 @@ namespace CosmosACPIAMl
             Stopwatch w = new();
             //STUFF
             {
-                ReadHeader();
+                //ReadHeader();
 
-                w.Start();
-                var dsdt = new Parser(_sdt);
-                var root = dsdt.Parse();
-                w.Stop();
-                if (root != null)
-                {
-                    foreach (var item in root.Nodes)
-                    {
-                        DisplayNode(item, " ");
-                    }
-                }
+                //w.Start();
+                //var dsdt = new Parser(_sdt);
+                //var root = dsdt.Parse();
+                //w.Stop();
+                //if (root != null)
+                //{
+                //    foreach (var item in root.Nodes)
+                //    {
+                //        DisplayNode(item, " ");
+                //    }
+                //}
                 Console.WriteLine("Running interupter");
-                _sdt = File.OpenRead(@"lenovo.aml");
+                _sdt = File.OpenRead(@"test.aml");
                 _reader = new BinaryReader(_sdt);
                 _reader.ReadBytes(36);
                 Interupter i = new();
@@ -62,10 +62,14 @@ namespace CosmosACPIAMl
                 Console.WriteLine(spacing + "Node: " + item.Name);
             Console.WriteLine(spacing + " - OpCode: " + item.Op.ToString());
             Console.WriteLine(spacing + $" - Length: {item.Length}, DataStart: {item.DataStart}, DataEnd: {item.DataStart + item.Length}");
+            if (item.Arguments != null)
             foreach (var arg in item.Arguments)
             {
-                var type = arg.Value == null ? "<null>" : arg.Value.GetType().Name;
-                Console.WriteLine(spacing + $" -- Argument: {ValueToString(arg)}, type: {type}");
+                if(arg != null)
+                {
+                    var type = arg.Value == null ? "<null>" : arg.Value.GetType().Name;
+                    Console.WriteLine(spacing + $" -- Argument: {ValueToString(arg)}, type: {type}");
+                }
             }
 
             spacing += "  ";

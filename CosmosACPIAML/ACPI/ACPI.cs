@@ -1,4 +1,5 @@
-﻿using ACPILibs.AML;
+﻿using ACPIAML.ACPI.Interupter;
+using ACPILibs.AML;
 using ACPILibs.Parser2;
 using Cosmos.Core;
 using Cosmos.Debug.Kernel;
@@ -620,11 +621,14 @@ namespace Cosmoss.Core
 
                     Log("Parse first node...");
 
-                    var node = root.Parse();
-                    foreach (var item in node.Nodes)
-                    {
-                        Log("Node: " + item.Name);
-                    }
+                    //var node = root.Parse();
+                    //foreach (var item in node.Nodes)
+                    //{
+                    //    Log("Node: " + item.Name);
+                    //}
+                    Interupter i = new();
+                    i.AddTable(root);
+                    i.Start();
                 }
 
             }

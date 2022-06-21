@@ -50,6 +50,33 @@ namespace ACPIAML.Interupter
         {
             return new() { Type = StackObjectType.ByteArray, Value = s };
         }
+
+        public override string ToString()
+        {
+            switch (Type)
+            {
+                case StackObjectType.Null:
+                    return "Null";
+                case StackObjectType.ParseNode:
+                    return (Value as ParseNode).ToString();
+                case StackObjectType.String:
+                    return (Value as string);
+                case StackObjectType.Byte:
+                    return ((byte)Value).ToString();
+                case StackObjectType.ByteArray:
+                    return ((byte[])Value).ToString();
+                case StackObjectType.Word:
+                    return ((short)Value).ToString();
+                case StackObjectType.DWord:
+                    return ((int)Value).ToString();
+                case StackObjectType.QWord:
+                    return ((long)Value).ToString();
+                case StackObjectType.Bool:
+                    return ((bool)Value).ToString();
+                default:
+                    return "?";
+            }
+        }
     }
     public enum StackObjectType
     {

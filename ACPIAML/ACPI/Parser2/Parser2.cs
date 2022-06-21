@@ -61,7 +61,8 @@ namespace ACPILibs.Parser2
                         break;
 
                     case OpCodeEnum.NamePath:
-                        op.Arguments.Add(StackObject.Create(ReadNameString()));
+                        op.Arguments = new StackObject[1];
+                        op.Arguments[0] = StackObject.Create(ReadNameString());
                         break;
 
                     default:
@@ -71,6 +72,7 @@ namespace ACPILibs.Parser2
 
                 if (parseArguments) //If the opcode is not a constant
                 {
+                    op.Arguments = new StackObject[info.ParseArgs.Length];
                     for (int x = 0; x < info.ParseArgs.Length; x++)
                     {
                         switch (info.ParseArgs[x])
@@ -88,7 +90,7 @@ namespace ACPILibs.Parser2
                                     var arg = ParseSimpleArgument(info.ParseArgs[x]);
                                     if (arg != null)
                                     {
-                                        op.Arguments.Add(arg);
+                                        op.Arguments[x] = arg;
                                     }
                                 }
                                 break;
@@ -96,20 +98,31 @@ namespace ACPILibs.Parser2
                             case ParseArgFlags.TermArg:
                                 {
                                     var arg = ParseFullOpCodeNode(parent); //parsenode
-
-                                    op.Arguments.Add(StackObject.Create(arg));
+                                    //if (arg.Op.Name != "NamePath")
+                                    //{
+                                    //    op.Arguments[x] = StackObject.Create(arg);
+                                    //}
+                                    //else
+                                    //{
+                                    //    op.Arguments[x] = arg.Arguments[0];
+                                    //    if ((string)op.Arguments[x].Value == "\\_OSI")
+                                    //    {
+                                    //        ;
+                                    //    }
+                                    //}
+                                    op.Arguments[x] = StackObject.Create(arg);
                                 }
                                 break;
 
                             case ParseArgFlags.PackageLength:
                                 var xx = op.Length = ReadPackageLength();
-                                op.Arguments.Add(StackObject.Create(xx));
+                                op.Arguments[x] = StackObject.Create(xx);
                                 break;
 
                             case ParseArgFlags.FieldList:
                                 while (_source.Position < op.End)
                                 {
-                                    op.Arguments.Add(StackObject.Create(ReadField(op)));
+                                    op.Arguments[x] = StackObject.Create(ReadField(op));
                                 }
                                 break;
 
@@ -121,10 +134,20 @@ namespace ACPILibs.Parser2
                                 break;
 
                             case ParseArgFlags.DataObjectList:
-                            case ParseArgFlags.TermList:
                             case ParseArgFlags.ObjectList:
                                 //var startPosition = _source.Position;
                           
+                                while (_source.Position < op.End)
+                                {
+                                    ParseNode child = ParseFullOpCodeNode(op);
+                                    op.Nodes.Add(child);
+                                }
+
+                                break;
+
+                            case ParseArgFlags.TermList:
+                                //var startPosition = _source.Position;
+
                                 while (_source.Position < op.End)
                                 {
                                     ParseNode child = ParseFullOpCodeNode(op);
@@ -139,15 +162,19 @@ namespace ACPILibs.Parser2
                                 if (subOp == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp) || Definitions.IsLeadingChar((byte)subOp))
                                 {
                                     var str = ReadNameString();
-                                    op.Arguments.Add(StackObject.Create(str));
-
-
+                                    op.Arguments[x] = StackObject.Create(str);
                                 }
                                 else
                                 {
-                                  //  _source.Seek(op.DataStart, SeekOrigin.Begin);
                                     var xxx = ParseFullOpCodeNode(op);
-                                    op.Nodes.Add(xxx);
+                                    if (xxx.Op.Name != "NamePath")
+                                    {
+                                        op.Arguments[x] = StackObject.Create(xxx);
+                                    }
+                                    else
+                                    {
+                                        op.Arguments[x] = xxx.Arguments[0];
+                                    }
                                 }
                                 break;
                             case ParseArgFlags.SimpleName:
@@ -156,15 +183,19 @@ namespace ACPILibs.Parser2
                                 if (subOp2 == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp2) || Definitions.IsLeadingChar((byte)subOp2))
                                 {
                                     var str = ReadNameString();
-                                    op.Arguments.Add(StackObject.Create(str));
-
-
+                                    op.Arguments[x] = StackObject.Create(str);
                                 }
                                 else
                                 {
-                                    _source.Seek(op.DataStart, SeekOrigin.Begin);
                                     var xxx = ParseFullOpCodeNode(op);
-                                    op.Nodes.Add(xxx);
+                                    if (xxx.Op.Name != "NamePath")
+                                    {
+                                        op.Arguments[x] = StackObject.Create(xxx);
+                                    }
+                                    else
+                                    {
+                                        op.Arguments[x] = xxx.Arguments[0];
+                                    }
                                 }
                                 break;
 
