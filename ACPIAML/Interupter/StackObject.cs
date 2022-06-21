@@ -21,6 +21,11 @@ namespace ACPIAML.Interupter
         {
             return new() { Type = StackObjectType.String, Value = s };
         }
+
+        public static StackObject Create(bool s)
+        {
+            return new() { Type = StackObjectType.Bool, Value = s };
+        }
         public static StackObject Create(ParseNode s)
         {
             return new() { Type = StackObjectType.ParseNode, Value = s };
@@ -65,5 +70,6 @@ namespace ACPIAML.Interupter
         /// long
         /// </summary>
         QWord,
+        Bool
     }
 }

@@ -19,25 +19,26 @@ namespace CosmosACPIAMl
             //lenovo.aml: Taken from a Lenovo Yoga 20C0
             //test.aml: Simple aml code
             //qemu.aml: taken from qemu
+            
 
-            _sdt = File.OpenRead(@"qemu.aml");
+            _sdt = File.OpenRead(@"test.aml");
             _reader = new BinaryReader(_sdt);
             Stopwatch w = new();
             //STUFF
             {
                 ReadHeader();
-             
+
                 w.Start();
                 var dsdt = new Parser(_sdt);
                 var root = dsdt.Parse();
                 w.Stop();
-                //if (root != null)
-                //{
-                //    foreach (var item in root.Nodes)
-                //    {
-                //        DisplayNode(item, " ");
-                //    }
-                //}
+                if (root != null)
+                {
+                    foreach (var item in root.Nodes)
+                    {
+                        DisplayNode(item, " ");
+                    }
+                }
                 Console.WriteLine("Running interupter");
                 _sdt = File.OpenRead(@"lenovo.aml");
                 _reader = new BinaryReader(_sdt);

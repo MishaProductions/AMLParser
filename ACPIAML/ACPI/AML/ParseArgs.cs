@@ -57,7 +57,7 @@ namespace ACPILibs.AML
 		public static ParseArgFlags[] ARGP_COMMENT_OP = { ParseArgFlags.ByteData, ParseArgFlags.Comment };
 		public static ParseArgFlags[] ARGP_CONCAT_OP = { ParseArgFlags.TermArg, ParseArgFlags.TermArg, ParseArgFlags.Target };
 		public static ParseArgFlags[] ARGP_CONCAT_RES_OP = { ParseArgFlags.TermArg, ParseArgFlags.TermArg, ParseArgFlags.Target };
-		public static ParseArgFlags[] ARGP_COND_REF_OF_OP = { ParseArgFlags.SimpleName, ParseArgFlags.Target };
+		public static ParseArgFlags[] ARGP_COND_REF_OF_OP = { ParseArgFlags.SuperName, ParseArgFlags.SuperName };
 		public static ParseArgFlags[] ARGP_CONNECTFIELD_OP = { ParseArgFlags.NameString };
 		public static ParseArgFlags[] ARGP_CONTINUE_OP = { ParseArgFlags.None };
 		public static ParseArgFlags[] ARGP_COPY_OP = { ParseArgFlags.TermArg, ParseArgFlags.SimpleName };

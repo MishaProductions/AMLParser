@@ -135,6 +135,21 @@ namespace ACPILibs.Parser2
 
                             case ParseArgFlags.Target:
                             case ParseArgFlags.SuperName:
+                                ushort subOp = PeekUShort();
+                                if (subOp == 0 || Definitions.IsNameRootPrefixOrParentPrefix((byte)subOp) || Definitions.IsLeadingChar((byte)subOp))
+                                {
+                                    var str = ReadNameString();
+                                    op.Arguments.Add(StackObject.Create(str));
+
+
+                                }
+                                else
+                                {
+                                  //  _source.Seek(op.DataStart, SeekOrigin.Begin);
+                                    var xxx = ParseFullOpCodeNode(op);
+                                    op.Nodes.Add(xxx);
+                                }
+                                break;
                             case ParseArgFlags.SimpleName:
                             case ParseArgFlags.NameOrReference:
                                 ushort subOp2 = PeekUShort();

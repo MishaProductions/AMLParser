@@ -147,10 +147,6 @@ namespace ACPILibs.AML
             {
                 name = "ParentPrefix";
             }
-            else if (code == OpCodeEnum.FirstLocal)
-            {
-                name = "FirstLocal";
-            }
             else if (code == OpCodeEnum.Local0)
             {
                 name = "Local0";
@@ -182,10 +178,6 @@ namespace ACPILibs.AML
             else if (code == OpCodeEnum.Local7)
             {
                 name = "Local7";
-            }
-            else if (code == OpCodeEnum.FirstArg)
-            {
-                name = "FirstArg";
             }
             else if (code == OpCodeEnum.Arg0)
             {

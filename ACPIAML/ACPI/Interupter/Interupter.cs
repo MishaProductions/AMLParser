@@ -1,4 +1,5 @@
-﻿using ACPILibs.AML;
+﻿using ACPIAML.Interupter;
+using ACPILibs.AML;
 using ACPILibs.Parser2;
 using System;
 using System.Collections.Generic;
@@ -60,7 +61,7 @@ namespace ACPIAML.ACPI.Interupter
             var x = ResolvePath(RootNode, "\\_SB_._INI");
             if (x != null)
             {
-                
+                Execute(x, new());
             }
 
 
@@ -79,6 +80,108 @@ namespace ACPIAML.ACPI.Interupter
             //    }
             //}
         }
+
+        private StackObject Execute(ParseNode method, MethodState state)
+        {
+            if (method.Op.Name == "Method" || method.Op.Name == "If" || method.Op.Name == "Else")
+            {
+               
+            }
+            else
+            {
+                return ExecSpecialOp(method, state);
+            }
+            for (int i = 0; i < method.Nodes.Count; i++)
+            {
+                ParseNode? nextOp = null;
+                if (i >= method.Nodes.Count-1)
+                { }
+                else
+                {
+                    nextOp = method.Nodes[i + 1];
+                }
+
+                ParseNode? prevOp = null;
+                if (i != 0)
+                {
+                    prevOp = method.Nodes[i - 1];
+                }
+
+                ParseNode currentOp = method.Nodes[i];
+
+                if (currentOp.Op.Name == "If")
+                {
+                    //check if we have else statement
+                    var elseStatement = false;
+                    if (nextOp != null)
+                    {
+                        if (nextOp.Name == "Else")
+                        {
+                            elseStatement = true;
+                        }
+                    }
+
+                    var x = (ParseNode)currentOp.Arguments[1].Value;
+                    var val = Execute(x, state);
+                    if ((bool)val.Value == true)
+                    {
+                        return Execute(currentOp, state);
+                    }
+                    else
+                    {
+                        if (elseStatement)
+                        {
+                            return Execute(nextOp, state);
+                        }
+                    }
+                }
+                else if (currentOp.Op.Name == "Return")
+                {
+                    if (currentOp.Arguments.Count > 0)
+                    {
+                        return currentOp.Arguments[0];
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+                else
+                {
+                    throw new Exception("Unknown opcode: " + currentOp.Op.Name);
+                }
+            }
+
+            return null;
+        }
+
+        private StackObject ExecSpecialOp(ParseNode method, MethodState state)
+        {
+            if (method.Op.Class != OpCodeClass.Execute)
+                throw new Exception("Attempt to execute non executable code");
+
+            if (method.Op.Name == "ConditionalReferenceOf")
+            {
+                var obj = (string)method.Arguments[0].Value;
+                var outRegister = method.Nodes[0].Op.Name;
+
+                var o = ResolvePath(RootNode, obj);
+                if (o == null)
+                {
+                    throw new Exception("Unable to create object: " + obj);
+                }
+
+                //todo: do this correctly
+                state.LocalRegisters[outRegister] = StackObject.Create(o);
+                return StackObject.Create(true);
+            }
+            else
+            {
+                throw new NotImplementedException("Special OpCode not implemented: "+method.Op.Name);
+            }
+            return null;
+        }
+
         public ParseNode? ResolvePath(ParseNode node, string path)
         {
             var pathIdx = 0;
@@ -197,6 +300,18 @@ namespace ACPIAML.ACPI.Interupter
                 }
             }
             return null;
+        }
+    }
+    internal class MethodState
+    {
+        public Dictionary<string, StackObject> LocalRegisters = new Dictionary<string, StackObject>();
+
+        public MethodState()
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                LocalRegisters.Add("Local"+i, null);
+            }
         }
     }
 }
