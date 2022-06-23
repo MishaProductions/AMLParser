@@ -24,7 +24,7 @@ namespace ACPILibs.Parser2
 
 		public ParseNode Parent;
 		public InternalMethod Override;
-		public delegate StackObject InternalMethod(StackObject[] args);
+		public delegate StackObject InternalMethod(ParseNode[] args);
 
 		public ParseNode(ParseNode parent)
         {

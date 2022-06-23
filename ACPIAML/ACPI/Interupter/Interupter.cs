@@ -33,10 +33,36 @@ namespace ACPIAML.ACPI.Interupter
                 throw new Exception("self test failed");
             }
         }
-
-        private StackObject OSIOverride(StackObject[] args)
+        public string[] SupportedOSes = new string[]
         {
-            throw new NotImplementedException();
+            "Windows 2000", /* Windows 2000 */
+            "Windows 2001", /* Windows XP */
+            "Windows 2001 SP1", /* Windows XP SP1 */
+            "Windows 2001.1", /* Windows Server 2003 */
+            "Windows 2006", /* Windows Vista */
+            "Windows 2006.1", /* Windows Server 2008 */
+            "Windows 2006 SP1", /* Windows Vista SP1 */
+            "Windows 2006 SP2", /* Windows Vista SP2 */
+            "Windows 2009", /* Windows 7 */
+            "Windows 2012", /* Windows 8 */
+            "Windows 2013", /* Windows 8.1 */
+            "Windows 2015" /* Windows 10 */
+        };
+        private StackObject OSIOverride(ParseNode[] args)
+        {
+            uint ret = 0;
+            var str = (string)args[0].ConstantValue.Value;
+            Console.WriteLine("_OSI: " + str);
+            foreach (var item in SupportedOSes)
+            {
+                if (item == str)
+                {
+                    ret = 0xFFFFFFFF;
+                    break;
+                }
+            }
+
+            return StackObject.Create((int)ret);
         }
 
         public void AddTable(Parser t)
@@ -67,31 +93,31 @@ namespace ACPIAML.ACPI.Interupter
             var handle = ResolvePath(RootNode, "\\_SB_._INI");
             if (handle != null)
             {
-                Execute(handle, new());
+                Execute(handle, new(), new());
             }
             else
             {
                 Console.WriteLine("warn: unable to find \\_SB_\\_INI");
             }
 
-            handle = ResolvePath(RootNode, "\\_SB_");
-            if (handle == null)
-            {
-                throw new Exception("_SB_ should exist.");
-            }
-            //_STA/_INI for all devices
-            InitChildren(handle);
+            //handle = ResolvePath(RootNode, "\\_SB_");
+            //if (handle == null)
+            //{
+            //    throw new Exception("_SB_ should exist.");
+            //}
+            ////_STA/_INI for all devices
+            //InitChildren(handle);
 
-            //tell the firmware about the IRQ mode
-            handle = ResolvePath(RootNode, "\\_PIC");
-            if (handle != null)
-            {
-                Execute(handle, new());
-            }
-            else
-            {
-                Console.WriteLine("warn: unable to find \\_PIC");
-            }
+            ////tell the firmware about the IRQ mode
+            //handle = ResolvePath(RootNode, "\\_PIC");
+            //if (handle != null)
+            //{
+            //    Execute(handle, new(), new());
+            //}
+            //else
+            //{
+            //    Console.WriteLine("warn: unable to find \\_PIC");
+            //}
         }
 
         private void InitChildren(ParseNode handle)
@@ -112,7 +138,7 @@ namespace ACPIAML.ACPI.Interupter
             var handle = ResolvePath(node, "_STA");
             if (handle != null)
             {
-                var r= Execute(handle, new MethodState());
+                var r = Execute(handle, new MethodState(), new());
                 if (r == null) throw new Exception("_STA returned null");
                 if (r.Type != StackObjectType.DWord) throw new Exception("_STA returned invaild type");
                 STA = (ulong)r.Value;
@@ -120,21 +146,28 @@ namespace ACPIAML.ACPI.Interupter
 
             return STA;
         }
-
-        private StackObject Execute(ParseNode method, MethodState state)
+        public Dictionary<string, StackObject> fields = new Dictionary<string, StackObject>();
+        private StackObject Execute(ParseNode method, MethodState state, List<ParseNode> args)
         {
-            if (method.Op.Name == "Method" || method.Op.Name == "If" || method.Op.Name == "Else")
+            if (method.Op == null)
             {
-               
+                return method.Override(args.ToArray());
+            }
+            if (method.Op.Name == "Method" || method.Op.Name == "If" || method.Op.Name == "Else" || method.Op.Name == "Return")
+            {
+
             }
             else
             {
                 return ExecSpecialOp(method, state);
             }
-            for (int i = 0; i < method.Nodes.Count; i++)
+            int i = 0;
+            i += args.Count;
+
+            for (; i < method.Nodes.Count; i++)
             {
                 ParseNode? nextOp = null;
-                if (i >= method.Nodes.Count-1)
+                if (i >= method.Nodes.Count - 1)
                 { }
                 else
                 {
@@ -161,21 +194,62 @@ namespace ACPIAML.ACPI.Interupter
                         }
                     }
 
-                    var x = currentOp.Arguments[1].Value;
-                    if (x is string s)
+                    var MethodToCall = (ParseNode)currentOp.Arguments[1].Value;
+
+                    var nodes = (ParseNode)MethodToCall;
+                    List<ParseNode> args2 = new List<ParseNode>();
+                    var z = 0;
+                    if (currentOp.Nodes.Count != 0)
                     {
-                        x = ResolvePath(RootNode, s);
+
+                        while (true)
+                        {
+                            var op = currentOp.Nodes[z];
+                            if (op.Op.Class == OpCodeClass.Argument)
+                            {
+                                args2.Add(op);
+                                i++;
+                                z++;
+
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
                     }
-                    var val = Execute((ParseNode)x, state);
-                    if ((bool)val.Value == true)
+
+                    var val = Execute(MethodToCall, state, args2);
+                    if ((int)val.Value != 0)
                     {
-                        return Execute(currentOp, state);
+                        List<ParseNode> args3 = new List<ParseNode>();
+                        var zz = 0;
+                        if (currentOp.Nodes.Count != 0)
+                        {
+
+                            while (true)
+                            {
+                                var op = currentOp.Nodes[z].Nodes[zz];
+                                if (op.Op.Class == OpCodeClass.Argument)
+                                {
+                                    args3.Add(op);
+                                    zz++;
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                             
+                            }
+                        }
+
+                        return Execute(currentOp, state, args3);
                     }
                     else
                     {
                         if (elseStatement)
                         {
-                            return Execute(nextOp, state);
+                            return Execute(nextOp, state, new());
                         }
                     }
                 }
@@ -192,7 +266,30 @@ namespace ACPIAML.ACPI.Interupter
                 }
                 else if (currentOp.Op.Name == "Store")
                 {
-                    ;
+                    var val = currentOp.Arguments[0];
+                    var var = currentOp.Arguments[1];
+                    
+                    if (var.Value is string s)
+                    {
+                        var field = ResolvePath(RootNode, s);
+                        if(field == null)
+                        {
+                            throw new Exception("Cannot resolve field: " + field + ", maybe its not in the root node?");
+                        }
+
+                        if (fields.ContainsKey(s))
+                        {
+                            fields[s] = val;
+                        }
+                        else
+                        {
+                            fields.Add(s, val);
+                        }
+                    }
+                    else
+                    {
+                        throw new NotImplementedException();
+                    }
                 }
                 else
                 {
@@ -221,11 +318,11 @@ namespace ACPIAML.ACPI.Interupter
 
                 //todo: do this correctly
                 state.LocalRegisters[outRegister] = StackObject.Create(o);
-                return StackObject.Create(true);
+                return StackObject.Create(1);
             }
             else
             {
-                throw new NotImplementedException("Special OpCode not implemented: "+method.Op.Name);
+                throw new NotImplementedException("Special OpCode not implemented: " + method.Op.Name);
             }
             return null;
         }
@@ -291,8 +388,8 @@ namespace ACPIAML.ACPI.Interupter
                     if (!startswithSlash) { startswithSlash = true; }
                     else { pathIdx++; }
                     segment[k] = path[pathIdx];
-                  
-                  
+
+
                 }
 
                 // ACPI pads names with trailing underscores.
@@ -362,7 +459,7 @@ namespace ACPIAML.ACPI.Interupter
         {
             for (int i = 0; i < 8; i++)
             {
-                LocalRegisters.Add("Local"+i, null);
+                LocalRegisters.Add("Local" + i, null);
             }
         }
     }

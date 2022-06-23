@@ -40,7 +40,7 @@ namespace CosmosACPIAMl
                 //    }
                 //}
                 Console.WriteLine("Running interupter");
-                _sdt = File.OpenRead(@"test.aml");
+                _sdt = File.OpenRead(@"lenovo.aml");
                 _reader = new BinaryReader(_sdt);
                 _reader.ReadBytes(36);
                 Interupter i = new();
