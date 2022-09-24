@@ -91,6 +91,7 @@ namespace ACPIAML.ACPI.Interupter
         {
             //first run \._SB_._INI
             var handle = ResolvePath(RootNode, "\\_SB_._INI");
+            DumpMethod(handle);
             if (handle != null)
             {
                 Execute(handle, new(), new());
@@ -118,6 +119,19 @@ namespace ACPIAML.ACPI.Interupter
             //{
             //    Console.WriteLine("warn: unable to find \\_PIC");
             //}
+        }
+
+        private void DumpMethod(ParseNode? handle)
+        {
+            if (handle != null)
+            {
+                Console.WriteLine("Method - " + handle.Name);
+
+                foreach (var node in handle.Nodes)
+                {
+                    ;
+                }
+            }
         }
 
         private void InitChildren(ParseNode handle)
@@ -159,7 +173,7 @@ namespace ACPIAML.ACPI.Interupter
             }
             else
             {
-                return ExecSpecialOp(method, state);
+                return ExecSpecialOp(method, state, args);
             }
             int i = 0;
             i += args.Count;
@@ -227,29 +241,29 @@ namespace ACPIAML.ACPI.Interupter
                         if (currentOp.Nodes.Count != 0)
                         {
 
-                            while (true)
-                            {
-                                var op = currentOp.Nodes[z].Nodes[zz];
-                                if (op.Op.Class == OpCodeClass.Argument)
-                                {
-                                    args3.Add(op);
-                                    zz++;
-                                }
-                                else
-                                {
-                                    break;
-                                }
+                            //while (true)
+                            //{
+                            //    var op = currentOp.Nodes[z].Nodes[zz];
+                            //    if (op.Op.Class == OpCodeClass.Argument)
+                            //    {
+                            //        args3.Add(op);
+                            //        zz++;
+                            //    }
+                            //    else
+                            //    {
+                            //        break;
+                            //    }
                              
-                            }
+                            //}
                         }
 
-                        return Execute(currentOp, state, args3);
+                        var x=  Execute(currentOp, state, args3);
                     }
                     else
                     {
                         if (elseStatement)
                         {
-                            return Execute(nextOp, state, new());
+                            var x = Execute(nextOp, state, new());
                         }
                     }
                 }
@@ -276,7 +290,7 @@ namespace ACPIAML.ACPI.Interupter
                         {
                             throw new Exception("Cannot resolve field: " + field + ", maybe its not in the root node?");
                         }
-
+                        Console.WriteLine("Writing " + val.ToString() + " to " + s);
                         if (fields.ContainsKey(s))
                         {
                             fields[s] = val;
@@ -291,6 +305,13 @@ namespace ACPIAML.ACPI.Interupter
                         throw new NotImplementedException();
                     }
                 }
+                else if (currentOp.Op.Name == "String")
+                {
+                    if (currentOp.Arguments != null)
+                    Console.WriteLine("Skipped string opcode: " + (string)currentOp.Arguments[1].Value);
+                    else
+                        Console.WriteLine("Skipped invaild string opcode");
+                }
                 else
                 {
                     throw new Exception("Unknown opcode: " + currentOp.Op.Name);
@@ -300,8 +321,22 @@ namespace ACPIAML.ACPI.Interupter
             return null;
         }
 
-        private StackObject ExecSpecialOp(ParseNode method, MethodState state)
+        private StackObject ExecSpecialOp(ParseNode method, MethodState state, List<ParseNode> args)
         {
+            if(method.Arguments.Length>0)
+            {
+                if (method.Op.Name == "NamePath")
+                {
+                    ;
+                    var o = ResolvePath(RootNode, (string)method.Arguments[0].Value);
+                    if (o == null)
+                    {
+                        throw new Exception("Invaild OpCode: Found Namepath instruction, however could not find it's value: " + (string)method.Arguments[0].Value);
+                    }
+
+                    return Execute(o, new MethodState(), args);
+                }
+            }
             if (method.Op.Class != OpCodeClass.Execute)
                 throw new Exception("Attempt to execute non executable code");
 

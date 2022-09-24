@@ -19,7 +19,8 @@ namespace CosmosACPIAMl
             //lenovo.aml: Taken from a Lenovo Yoga 20C0
             //test.aml: Simple aml code
             //qemu.aml: taken from qemu
-            
+            //gigabyte.dat: taken from Gigabyte A520M DS3H motherboard
+            //elitebook.dat: Taken from HP elitebook 8470p
 
             _sdt = File.OpenRead(@"test.aml");
             _reader = new BinaryReader(_sdt);
@@ -40,7 +41,7 @@ namespace CosmosACPIAMl
                 //    }
                 //}
                 Console.WriteLine("Running interupter");
-                _sdt = File.OpenRead(@"lenovo.aml");
+                _sdt = File.OpenRead(@"test.aml");
                 _reader = new BinaryReader(_sdt);
                 _reader.ReadBytes(36);
                 Interupter i = new();
