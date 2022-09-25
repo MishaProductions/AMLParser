@@ -599,17 +599,17 @@ namespace Cosmoss.Core
                 if (acpiCheckHeader((byte*)FADT->Dsdt, "DSDT") == 0)
                 {
                     Log("Found valid DSDT");
-                    uint dsdtAddress = FADT->Dsdt;
-                    uint dsdtLength = (uint)(*((int*)FADT->Dsdt + 1) - sizeof(AcpiHeader));
+                    //uint dsdtAddress = FADT->Dsdt;
+                    //uint dsdtLength = (uint)(*((int*)FADT->Dsdt + 1) - sizeof(AcpiHeader));
 
-                    var dsdtHeader = new MemoryBlock08(dsdtAddress, 36);
-                    var _reader = new BinaryReader(new MemoryStream(dsdtHeader.ToArray()));
+                    //var dsdtHeader = new MemoryBlock08(dsdtAddress, 36);
+                    //var _reader = new BinaryReader(new MemoryStream(dsdtHeader.ToArray()));
 
-                    ReadHeader(_reader);
+                    //ReadHeader(_reader);
 
-                    var dsdtBlock = new MemoryBlock08(dsdtAddress + (uint)sizeof(AcpiHeader), SdtLength - (uint)sizeof(AcpiHeader));
+                    //var dsdtBlock = new MemoryBlock08(dsdtAddress + (uint)sizeof(AcpiHeader), SdtLength - (uint)sizeof(AcpiHeader));
                 
-                    Stream stream = new MemoryStream(dsdtBlock.ToArray());
+                    //Stream stream = new MemoryStream(dsdtBlock.ToArray());
 
                     Log("Create parser...");
                     lai_create_namespace();
@@ -662,8 +662,8 @@ namespace Cosmoss.Core
 
         public static void Log(string m, bool console = true)
         {
-           //Global.mDebugger.Send(m);
-            if (console)
+           Global.mDebugger.Send(m);
+           // if (console)
                 Console.WriteLine(m);
         }
 

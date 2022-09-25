@@ -1,5 +1,7 @@
 ﻿using Cosmos.Core;
 using Cosmos.System.Graphics;
+using Cosmos.System.Network.IPv4.TCP;
+using CosmosACPIAMl;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Transactions;
 using static Cosmoss.Core.ACPI;
 
 namespace Cosmoss.Core
@@ -36,10 +39,9 @@ namespace Cosmoss.Core
 
         private const int LAI_POPULATE_STACKITEM = 1;
         private const int LAI_NODE_STACKITEM = 7;
-        // Evaluate constant data (and keep result).
-        //     Primitive objects are parsed.
-        //     Names are left unresolved.
-        //     Operations (e.g. Add()) are not allowed.
+        /// <summary>
+        /// Evaluate constant data (and keep result). Primitive objects are parsed. Names are left unresolved. Operations (e.g. Add()) are not allowed.
+        /// </summary>
         private const int LAI_DATA_MODE = 1;
         // Evaluate dynamic data (and keep result).
         //     Primitive objects are parsed.
@@ -185,11 +187,14 @@ namespace Cosmoss.Core
 
             ReadHeader(_reader);
 
-            var dsdtBlock = new MemoryBlock08(dsdtAddress + (uint)sizeof(AcpiHeader), SdtLength - (uint)sizeof(AcpiHeader));
-
+            var dsdtBlock = new MemoryBlock08(dsdtAddress + 36, SdtLength);
+            Console.WriteLine("The DSDT is located at " + FADT->Dsdt);
             Stream stream = new MemoryStream(dsdtBlock.ToArray());
 
             //</cosmos>
+
+            //  Kernel.PrintDebug(Convert.ToBase64String(dsdtBlock.ToArray()));
+
             populate_ctxitem.code = dsdtBlock.ToArray();
             populate_ctxitem.handle = parent;
 
@@ -305,9 +310,12 @@ namespace Cosmoss.Core
                 Console.WriteLine("k is " + k);
                 if (Decompress(item.node_arg_modes)[k] == 0)
                 {
-                    //lai_operand operands = lai_exec_get_opstack(state, item.opstack_frame);
-                    lai_panic("condition not implementaion");
-                    return 3;
+                    lai_operand operands = lai_exec_get_opstack(state, item.opstack_frame);
+                    lai_exec_reduce_node(item.node_opcode, state, operands, ctx_handle);
+                    lai_exec_pop_opstack(state, k);
+
+                    lai_exec_pop_stack_back(state);
+                    return 0;
                 }
                 else
                 {
@@ -320,6 +328,151 @@ namespace Cosmoss.Core
                 return 1;
             }
         }
+
+        private static void lai_exec_reduce_node(int opcode, lai_state state, lai_operand operands, lai_nsnode ctx_handle)
+        {
+            Console.WriteLine("lai_exec_reduce_node: opcode " + opcode);
+            switch (opcode)
+            {
+                case NAME_OP:
+                    lai_variable objectt = new lai_variable();
+                    // ..lai_exec_get_objectref(state, &operands[1], objectt);
+                    objectt = operands.objectt;
+
+                    if (operands.tag != LAI_UNRESOLVED_NAME)
+                    {
+                        lai_panic("assertion failure: tag must be LAI_UNRESOLVED_NAME in lai_exec_reduce_node");
+                    }
+                    lai_amlname amln = new lai_amlname();
+                    lai_amlname_parse(ref amln, operands.cosmos_aml, operands.unres_aml);
+                    Console.WriteLine($"it: {(int)amln.it}, end: {(int)amln.end}");
+                    lai_nsnode node = new lai_nsnode();
+                    node.type = LAI_NAMESPACE_NAME;
+                    lai_do_resolve_new_node(node, ctx_handle, ref amln);
+                    node.objectt = objectt;
+
+                    lai_install_nsnode(node);
+                    var item = lai_exec_peek_ctxstack_back(state);
+                    if (item.invocation != null)
+                    {
+                        //todo
+                        // item.invocation.per_method_list.Add(node.per_method_item);
+                    }
+                    break;
+                default:
+                    lai_panic("undefined opcode in lai_exec_reduce_node: " + opcode);
+                    break;
+            }
+        }
+
+        private static void lai_do_resolve_new_node(lai_nsnode node, lai_nsnode ctx_handle, ref lai_amlname in_amln)
+        {
+            var amln = in_amln;
+
+            lai_nsnode parent = ctx_handle;
+            // ctx_handle needs to be resolved.
+
+            if (parent.type == LAI_NAMESPACE_ALIAS)
+            {
+                lai_panic("lai_do_resolve_new_node: parent type cannot be LAI_NAMESPACE_ALIAS");
+            }
+            // Note: we do not care about amln->search_scopes here.
+            //       As we are creating a new name, the code below already does the correct thing.
+            if (amln.is_absolute)
+            {
+                while (parent.parent != null)
+                {
+                    parent = parent.parent;
+
+                }
+                if (parent.type != LAI_NAMESPACE_ROOT)
+                {
+                    lai_panic("lai_do_resolve_new_node: parent type cannot be LAI_NAMESPACE_ROOT");
+                }
+
+
+            }
+
+            for (int i = 0; i < amln.height; i++)
+            {
+                if (parent.parent == null)
+                {
+                    //  LAI_ENSURE(parent->type == LAI_NAMESPACE_ROOT);
+                    if (parent.type != LAI_NAMESPACE_ROOT)
+                    {
+                        lai_panic("lai_do_resolve_new_node: parent type cannot be LAI_NAMESPACE_ROOT (x2)");
+                    }
+                    break;
+                }
+
+                parent = parent.parent;
+            }
+            Console.WriteLine($"it: {(int)amln.it}, end: {(int)amln.end}");
+            // Otherwise the new object has an empty name.
+            if ((int)amln.end == (int)amln.it)
+            {
+                lai_panic("string reading cannot be over");
+            }
+
+            while (true)
+            {
+                string segment = "";
+                for (int i = 0; i < 4; i++)
+                    segment += (char)amln.it[i];
+                amln.it += 4;
+
+                if (amln.it == amln.end)
+                {
+                    node.name = segment;
+                    node.parent = parent;
+                    Console.WriteLine("Created NEW node: " + node.name);
+                    break;
+                }
+                else
+                {
+                    parent = lai_ns_get_child(parent, segment);
+                    if (parent == null)
+                    {
+                        lai_panic("lai_ns_get_child() cannot retun null. segment is " + segment + ", parent name is ");
+                    }
+                    if (parent.type == LAI_NAMESPACE_ALIAS)
+                    {
+                        Console.WriteLine("resolution of new object name traverses Alias() -  this is not supported in ACPICA");
+                        parent = parent.al_target;
+                        if (parent.type == LAI_NAMESPACE_ALIAS)
+                        {
+                            lai_panic("parent type cannot be LAI_NAMESPACE_ALIAS (x3)");
+                        }
+                    }
+                }
+            }
+        }
+
+        private static lai_nsnode lai_ns_get_child(lai_nsnode parent, string name)
+        {
+            foreach (var item in parent.children)
+            {
+                if (item.name == name)
+                {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        private static lai_operand lai_exec_get_opstack(lai_state state, int n)
+        {
+            if (n < state.opstack_ptr)
+            {
+
+            }
+            else
+            {
+                lai_panic("fatal error: n < state.opstack_ptr must be true in lai_exec_get_opstack");
+            }
+            return state.opstack_base[n];
+        }
+
         private const int DUAL_PREFIX = 0x2E;
         private const int MULTI_PREFIX = 0x2F;
         private const int PARENT_CHAR = 0x5E;
@@ -334,6 +487,18 @@ namespace Cosmoss.Core
             else
                 return false;
         }
+        private const int LAI_UNRESOLVED_NAME = 3;
+        private const int METHOD_OP = 0x14;
+        private const int NOP_OP = 0xA3;
+        private const int OPREGION = 0x80;
+        private const int SCOPE_OP = 0x10;
+        private const int BYTEPREFIX = 0x0A;
+        private const int WORDPREFIX = 0x0B;
+        private const int DWORDPREFIX = 0x0C;
+        private const int STRINGPREFIX = 0x0D;
+        private const int QWORDPREFIX = 0x0E;
+        private const int LAI_OPERAND_OBJECT = 1;
+        private const int LAI_INTEGER = 1;
         private static int lai_exec_parse(int parse_mode, lai_state state)
         {
             lai_ctxitem ctxitem = lai_exec_peek_ctxstack_back(state);
@@ -364,23 +529,52 @@ namespace Cosmoss.Core
 
             // Whether we use the result of an expression or not.
             // If yes, it will be pushed onto the opstack after the expression is computed.
-            int want_result = LAI_MF_RESOLVE | LAI_MF_INVOKE;// lai_mode_flags[parse_mode] & LAI_MF_RESULT;
+            int want_result = ReadFlags(parse_mode) & LAI_MF_RESULT;//LAI_MF_RESOLVE | LAI_MF_INVOKE;// lai_mode_flags[parse_mode] & LAI_MF_RESULT;
 
             //todo big if statement
 
             // Process names. (todo)
+            int oldpc = pc;
             if (lai_is_name(method[pc]))
             {
                 lai_amlname amln = new lai_amlname();
-                if (!lai_parse_name(ref amln, method, ref pc, limit))
+                if (lai_parse_name(ref amln, method, ref pc, limit))
                 {
                     Console.WriteLine("lai_parse_name failed");
                     return 1;
                 }
 
-                lai_exec_commit_pc(state, pc);
+                lai_exec_commit_pc(ref state, pc);
                 string path = lai_stringify_amlname(amln);
                 Console.WriteLine("parsing name " + path + " at " + pc);
+                if (parse_mode == LAI_DATA_MODE)
+                {
+                    if (want_result != 0)
+                    {
+                        //TODO
+                        Console.WriteLine("parse_mode == LAI_DATA_MODE and want_result != 0 todo");
+                    }
+                }
+                else if ((ReadFlags(parse_mode) & LAI_MF_RESOLVE) == 0)
+                {
+                    if (want_result != 0)
+                    {
+                        var opstack_res = lai_exec_push_opstack(state);
+                        opstack_res.tag = LAI_UNRESOLVED_NAME;
+                        opstack_res.unres_ctx_handle = ctx_handle;
+                        Console.WriteLine("****PC: " + oldpc + "****");
+                        opstack_res.unres_aml = oldpc;
+                        opstack_res.cosmos_aml = method;
+
+                        state.opstack_base[state.opstack_base.Count - 1] = opstack_res;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("WARMING: RESOLVING NOT IMPLEMETNATION!");
+                    lai_nsnode handle = lai_do_resolve(ctx_handle, ref amln);
+
+                }
                 return 0;
             }
 
@@ -404,24 +598,332 @@ namespace Cosmoss.Core
 
             switch (opcode)
             {
+                case NOP_OP:
+                    lai_exec_commit_pc(ref state, pc);
+                    break;
+                case BYTEPREFIX:
+                case WORDPREFIX:
+                case DWORDPREFIX:
+                case QWORDPREFIX:
+                    {
+                        ulong value = 0;
+                        switch (opcode)
+                        {
+                            case BYTEPREFIX:
+                                {
+                                    byte temp = 0;
+                                    if (lai_parse_u8(ref temp, method, ref pc, limit))
+                                    {
+                                        Console.WriteLine("failed to parse BYTEPREFIX");
+                                        return 5;
+                                    }
+                                    value = temp;
+                                    break;
+                                }
+                            default:
+                                Console.WriteLine("Data type not implemnation: " + opcode);
+                                break;
+                        }
+                        lai_exec_commit_pc(ref state, pc);
+                        if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE)
+                        {
+                            lai_operand result = lai_exec_push_opstack(state);
+                            result.tag = LAI_OPERAND_OBJECT;
+                            result.objectt.type = LAI_INTEGER;
+                            result.objectt.integer = value;
+                        }
+                        else
+                        {
+                            if (parse_mode != LAI_EXEC_MODE)
+                            {
+                                lai_panic("In order to read the *prefix opcodes, you must be in EXEC mode");
+                            }
+                        }
+                        break;
+                    }
                 case NAME_OP:
-                    lai_exec_commit_pc(state, pc);
-                    lai_stackitem node_item = lai_exec_push_stack(state, LAI_NODE_STACKITEM);
-                    node_item.node_opcode = opcode;
-                    node_item.opstack_frame = state.opstack_ptr;
-                    byte[] x = new byte[8];
-                    x[0] = LAI_UNRESOLVED_MODE;
-                    x[1] = LAI_OBJECT_MODE;
-                    x[2] = 0;
-                    node_item.node_arg_modes = Compress(x);
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+                        lai_stackitem node_item = lai_exec_push_stack(state, LAI_NODE_STACKITEM);
+                        node_item.node_opcode = opcode;
+                        node_item.opstack_frame = state.opstack_ptr;
+                        byte[] x = new byte[8];
+                        x[0] = LAI_UNRESOLVED_MODE;
+                        x[1] = LAI_OBJECT_MODE;
+                        x[2] = 0;
+                        node_item.node_arg_modes = Compress(x);
 
-                    state.stack_base[state.stack_base.Count - 1] = node_item;
+                        state.stack_base[state.stack_base.Count - 1] = node_item;
+                    }
 
 
                     break;
+                case SCOPE_OP:
+                    {
+                        int nested_pc;
+                        var encoded_size = 0;
+                        lai_amlname amln = new lai_amlname();
+
+                        if (lai_parse_varint(ref encoded_size, method, ref pc, limit) || lai_parse_name(ref amln, method, ref pc, limit))
+                        {
+                            Console.WriteLine("FAILURE");
+                            return 5;
+                        }
+                        nested_pc = pc;
+                        pc = opcode_pc + 1 + encoded_size;
+                        lai_exec_commit_pc(ref state, pc);
+
+                        lai_nsnode scoped_ctx_handle = lai_do_resolve(ctx_handle, ref amln);
+                        if (scoped_ctx_handle == null)
+                        {
+                            lai_warn("Could not resolve node referenced in Scope");
+                            return 7;
+                        }
+
+                        var populate_ctxitem = lai_exec_push_ctxstack(state);
+                        populate_ctxitem.amls = amls;
+                        populate_ctxitem.code = method;
+                        populate_ctxitem.handle = scoped_ctx_handle;
+                        state.ctxstack_base[state.ctxstack_base.Count - 1] = populate_ctxitem;
+
+                        var blkitem = lai_exec_push_blkstack(state);
+                        blkitem.pc = nested_pc;
+                        blkitem.limit = opcode_pc + 1 + encoded_size;
+
+                        lai_stackitem item = lai_exec_push_stack(state, LAI_POPULATE_STACKITEM);
+                        break;
+                    }
+
+                case METHOD_OP:
+                    {
+                        int encoded_size = 0;
+                        lai_amlname amln = new lai_amlname();
+                        byte flags = 0;
+                        if (lai_parse_varint(ref encoded_size, method, ref pc, limit)
+                            || lai_parse_name(ref amln, method, ref pc, limit)
+                            || lai_parse_u8(ref flags, method, ref pc, limit))
+                        {
+                            Console.WriteLine("Method_OP: failed to parse");
+                            return 5;
+                        }
+                        int nested_pc = pc;
+                        pc = opcode_pc + 1 + encoded_size;
+
+                        lai_exec_commit_pc(ref state, pc);
+                        lai_nsnode node = new lai_nsnode();
+                        node.type = LAI_NAMESPACE_METHOD;
+                        lai_do_resolve_new_node(node, ctx_handle, ref amln);
+                        node.method_flags = flags;
+                        node.amls = amls;
+                        node.offset = nested_pc;
+                        node.size = pc - nested_pc;
+                        lai_install_nsnode(node);
+
+                        break;
+                    }
+                     case (EXTOP_PREFIX << 8) | OPREGION:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+                        lai_stackitem node_item = lai_exec_push_stack(state);
+
+                        break;
+                    }
                 default:
                     lai_panic("Unknown opcode: " + opcode);
                     break;
+
+
+            }
+            return 0;
+        }
+
+        private static bool lai_parse_u8(ref byte output, byte[] code, ref int pc, int limit)
+        {
+            if (pc + 1 > limit)
+                return true;
+
+            output = code[pc];
+            pc++;
+            return false;
+        }
+
+        private static bool lai_parse_varint(ref int outvar, byte[] code, ref int pc, int limit)
+        {
+            if (pc + 1 > limit)
+                return true;
+            var sz = (code[pc] >> 6) & 3;
+            if (sz == 0)
+            {
+                outvar = (int)(code[pc] & 0x3F);
+                pc++;
+                return false;
+            }
+            else if (sz == 1)
+            {
+                if (pc + 2 > limit)
+                    return true;
+                outvar = (int)(code[pc] & 0x0F) | (int)(code[pc + 1] << 4);
+                pc += 2;
+                return false;
+            }
+            else if (sz == 2)
+            {
+                if (pc + 3 > limit)
+                    return true;
+                outvar = (int)(code[pc] & 0x0F) | (int)(code[pc + 1] << 4)
+                       | (int)(code[pc + 2] << 12);
+                pc += 3;
+                return false;
+            }
+            else
+            {
+                if (sz != 3)
+                {
+                    lai_panic("lai_parse_varint: SZ must be 3");
+                }
+                if (pc + 4 > limit)
+                    return true;
+                outvar = (int)(code[pc] & 0x0F) | (int)(code[pc + 1] << 4)
+                       | (int)(code[pc + 2] << 12) | (int)(code[pc + 3] << 20);
+                pc += 4;
+                return false;
+            }
+        }
+
+        private static lai_nsnode lai_do_resolve(lai_nsnode ctx_handle, ref lai_amlname in_amln)
+        {
+            lai_amlname amln = in_amln;
+            lai_nsnode current = ctx_handle;
+            LAI_ENSURE(current.type != LAI_NAMESPACE_ALIAS, "lai_do_resolve: current->type != LAI_NAMESPACE_ALIAS");
+
+            if (amln.search_scopes)
+            {
+                string segment="";
+                for (int i = 0; i < 4; i++)
+                    segment += (char)amln.it[i];
+                amln.it += 4;
+                Console.WriteLine("Resolving " + segment + " by searching through scopes");
+                while(current != null)
+                {
+                    lai_nsnode node = lai_ns_get_child(current, segment);
+                    if(node == null)
+                    {
+                        current = current.parent;
+                        continue;
+                    }
+
+                    if(node.type == LAI_NAMESPACE_ALIAS)
+                    {
+                        node = node.al_target;
+                        LAI_ENSURE(node.type != LAI_NAMESPACE_ALIAS, "node->type != LAI_NAMESPACE_ALIAS");
+                    }
+                    Console.WriteLine("resolution returns " + lai_stringify_amlname(amln));
+                    return node;
+                }
+                return null;
+            }
+            else
+            {
+                if (amln.is_absolute)
+                {
+                    while (current.parent != null)
+                        current = current.parent;
+                    LAI_ENSURE(current.type == LAI_NAMESPACE_ROOT, "current->type == LAI_NAMESPACE_ROOT x2");
+                }
+
+                for (int i = 0; i < amln.height; i++)
+                {
+                    if(current.parent == null)
+                    {
+                        LAI_ENSURE(current.type == LAI_NAMESPACE_ROOT, "current->type == LAI_NAMESPACE_ROOT x3");
+                        break;
+                    }
+                    current = current.parent;
+                }
+
+                if (amln.it == amln.end)
+                {
+                    return current;
+                }
+
+                while (amln.it != amln.end)
+                {
+                    string segment = "";
+                    for (int i = 0; i < 4; i++)
+                        segment += (char)amln.it[i];
+                    amln.it += 4;
+
+                    current = lai_ns_get_child(current, segment);
+                    if (current == null)
+                        return null;
+                }
+
+                if(current.type == LAI_NAMESPACE_ALIAS)
+                {
+                    current = current.al_target;
+                    LAI_ENSURE(current.type == LAI_NAMESPACE_ROOT, "current->type == LAI_NAMESPACE_ROOT x4");
+                }
+                return current;
+            }
+            return null;
+        }
+
+        private static void LAI_ENSURE(bool condition, string message)
+        {
+            if (!condition)
+            {
+                lai_panic("Assertion failed: " + message);
+            }
+        }
+
+        private const int LAI_REFERENCE_MODE = 5;
+        private const int LAI_OPTIONAL_REFERENCE_MODE = 6;
+        private const int LAI_IMMEDIATE_BYTE_MODE = 7;
+        private const int LAI_IMMEDIATE_WORD_MODE = 8;
+        private const int LAI_IMMEDIATE_DWORD_MODE = 9;
+        private static int ReadFlags(int parse_mode)
+        {
+            //cosmos-specific function
+
+            if (parse_mode == LAI_IMMEDIATE_BYTE_MODE)
+            {
+                return LAI_MF_RESULT;
+            }
+            else if (parse_mode == LAI_IMMEDIATE_WORD_MODE)
+            {
+                return LAI_MF_RESULT;
+            }
+            else if (parse_mode == LAI_IMMEDIATE_DWORD_MODE)
+            {
+                return LAI_MF_RESULT;
+            }
+            else if (parse_mode == LAI_EXEC_MODE)
+            {
+                return LAI_MF_RESOLVE | LAI_MF_INVOKE;
+            }
+            else if (parse_mode == LAI_UNRESOLVED_MODE)
+            {
+                return LAI_MF_RESULT;
+            }
+            else if (parse_mode == LAI_DATA_MODE)
+            {
+                return LAI_MF_RESULT;
+            }
+            else if (parse_mode == LAI_OBJECT_MODE)
+            {
+                return LAI_MF_RESULT | LAI_MF_RESOLVE | LAI_MF_INVOKE;
+            }
+            else if (parse_mode == LAI_REFERENCE_MODE)
+            {
+                return LAI_MF_RESULT | LAI_MF_RESOLVE;
+            }
+            else if (parse_mode == LAI_OPTIONAL_REFERENCE_MODE)
+            {
+                return LAI_MF_RESULT | LAI_MF_RESOLVE | LAI_MF_NULLABLE;
+            }
+            else
+            {
+                lai_panic("ReadFlags() unsupported support " + parse_mode);
             }
             return 0;
         }
@@ -463,7 +965,7 @@ namespace Cosmoss.Core
                     ret += ".";
                 }
             }
-            Console.WriteLine("ret len is " + ret.Length+"it: "+(int)amln.it+", end: "+(int)amln.end);
+            Console.WriteLine("ret len is " + ret.Length + "it: " + (int)amln.it + ", end: " + (int)amln.end);
             if (ret.Length <= max_length)
             {
 
@@ -484,7 +986,7 @@ namespace Cosmoss.Core
         private static bool lai_parse_name(ref lai_amlname amln, byte[] method, ref int pc, int limit)
         {
             pc += lai_amlname_parse(ref amln, method, pc);
-            return true;
+            return false;
         }
 
         private static int lai_amlname_parse(ref lai_amlname amln, byte[] data, int startIndex)
@@ -541,7 +1043,7 @@ namespace Cosmoss.Core
                     num_segs = 1;
                 }
 
-                amln.search_scopes = (!amln.is_absolute && amln.height == 0 && num_segs == 1) ? 1 : 0;
+                amln.search_scopes = !amln.is_absolute && amln.height == 0 && num_segs == 1;
                 amln.it = it;
                 amln.end = it + 4 * num_segs;
                 return (int)(amln.end - begin);
@@ -557,7 +1059,7 @@ namespace Cosmoss.Core
         {
             return BitConverter.GetBytes(b);
         }
-        private static void lai_exec_commit_pc(lai_state state, int pc)
+        private static void lai_exec_commit_pc(ref lai_state state, int pc)
         {
             //  var block = lai_exec_peek_blkstack_back(state);
             // block.pc = pc;
@@ -631,7 +1133,14 @@ namespace Cosmoss.Core
 
             return state.ctxstack_base[state.ctxstack_base.Count - 1];
         }
+        public static lai_operand lai_exec_push_opstack(lai_state state)
+        {
+            state.opstack_ptr++;
+            // LAI_ENSURE(state->ctxstack_ptr < state->ctxstack_capacity);
+            state.opstack_base.Add(new lai_operand() { objectt = new lai_variable() });
 
+            return state.opstack_base[state.opstack_base.Count - 1];
+        }
         private static lai_aml_segment lai_load_table(void* ptr, int index)
         {
             var x = new lai_aml_segment();
@@ -649,7 +1158,15 @@ namespace Cosmoss.Core
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("LAI PANIC: " + error);
-            while (true) { }
+            Console.WriteLine("This is a critical error. Press the ENTER key to skip. Not Recommended");
+            Console.ReadLine();
+            Console.ForegroundColor = ConsoleColor.White;
+        }
+        private static void lai_warn(string warn)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("WARN: " + warn);
+            Console.ForegroundColor = ConsoleColor.White;
         }
 
         private static void lai_install_nsnode(lai_nsnode node)
@@ -671,14 +1188,23 @@ namespace Cosmoss.Core
         }
     }
 
-    public class lai_nsnode
+    public unsafe class lai_nsnode
     {
         public string name;
         public int type;
         public lai_nsnode parent;
+        public lai_nsnode al_target;
+        public lai_variable objectt;
         public List<lai_nsnode> children = new List<lai_nsnode>();
         public int method_flags;
         public Action method_override;
+        public lai_aml_segment amls;
+        public byte[] objectaml;
+        /// <summary>
+        /// AML offset
+        /// </summary>
+        public int offset;
+        public int size;
     }
     [StructLayout(LayoutKind.Sequential)]
     public struct acpi_aml_t
@@ -691,9 +1217,19 @@ namespace Cosmoss.Core
         // Index of the table (e.g., for SSDTs).
         public int index = 0;
     }
-    public class lai_variable_t
+    public class lai_variable
     {
+        public int type;
+        /// <summary>
+        /// For Name()
+        /// </summary>
+        public ulong integer;
 
+
+        public int iref_index;
+
+        public lai_nsnode handle;
+        public int index;
     }
     public class lai_invocation
     {
@@ -721,8 +1257,8 @@ namespace Cosmoss.Core
     {
         public List<lai_ctxitem> ctxstack_base = new List<lai_ctxitem>();
         public List<lai_blkitem> blkstack_base = new List<lai_blkitem>();
-
         public List<lai_stackitem> stack_base = new List<lai_stackitem>();
+        public List<lai_operand> opstack_base = new List<lai_operand>();
         //...
         public int ctxstack_ptr = -1; // Stack to track the current context.
         public int blkstack_ptr = -1; // Stack to track the current block.
@@ -814,9 +1350,23 @@ namespace Cosmoss.Core
     {
         public bool is_absolute;
         public int height;
-        public int search_scopes;
+        public bool search_scopes;
 
         public byte* it;
         public byte* end;
+    }
+
+    public unsafe struct lai_operand
+    {
+        public int tag;
+        public lai_variable objectt;
+        public int index;
+        public lai_nsnode unres_ctx_handle;
+        /// <summary>
+        /// offset
+        /// </summary>
+        public int unres_aml;
+        public byte[] cosmos_aml;
+        public lai_nsnode handle;
     }
 }
