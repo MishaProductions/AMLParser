@@ -324,13 +324,57 @@ namespace Cosmoss.Core
                     return lai_exec_parse(Decompress(item.node_arg_modes)[k], state);
                 }
             }
+            else if (item.kind == LAI_BUFFER_STACKITEM)
+            {
+                int k = state.opstack_ptr - item.opstack_frame;
+                LAI_ENSURE(k <= 1, "lai_exec_process: LAI_BUFFER_STACKITEM: k<=1. opstackptr: " + state.opstack_ptr + ", frame: " + item.opstack_frame);
+                if (k == 1)
+                {
+                    var size = new lai_variable();
+                    lai_operand operand = lai_exec_get_opstack(state, item.opstack_frame)[0];
+                    size = operand.objectt;
+                    lai_exec_pop_opstack_back(ref state, 1);
+
+                    var result = new lai_variable();
+                    int initial_size = block.limit - block.pc;
+                    if (initial_size < 0)
+                        lai_panic("buffer initializer has negative size");
+                    byte[] buffer = new byte[initial_size];
+                    for (int i = 0; i < initial_size; i++)
+                    {
+                        var b = method[block.pc + i];
+                        buffer[i] = b;
+                    }
+                    result.buffer = buffer;
+                    if (item.buf_want_result != 0)
+                    {
+                        lai_operand opstack_res = lai_exec_push_opstack(state);
+                        opstack_res.tag = LAI_OPERAND_OBJECT;
+                        opstack_res.objectt.buffer = buffer;
+                        state.opstack_base[state.opstack_base.Count - 1] = opstack_res;
+                    }
+
+                    lai_exec_pop_blkstack_back(state);
+                    lai_exec_pop_stack_back(state);
+                    return 0;
+                }
+                else
+                {
+                    return lai_exec_parse(LAI_OBJECT_MODE, state);
+                }
+            }
             else
             {
                 lai_log("lai_exec_process: " + item.kind + " not implemented");
                 return 1;
             }
         }
-
+        private static void lai_exec_pop_opstack_back(ref lai_state state, int n)
+        {
+            lai_log("maybe broken function: lai_exec_pop_opstack_back");
+            state.opstack_ptr -= n;
+            state.opstack_base.RemoveAt(state.opstack_base.Count - n);
+        }
         private static void lai_exec_reduce_node(int opcode, lai_state state, lai_operand[] operands, lai_nsnode ctx_handle)
         {
             lai_log("lai_exec_reduce_node: opcode " + opcode);
@@ -542,6 +586,8 @@ namespace Cosmoss.Core
         private const int LAI_NULL_NAME = 2;
         private const int MUTEX = 0x01;
         private const int DEVICE = 0x82;
+        private const int BUFFER_OP = 0x11;
+        private const int LAI_BUFFER_STACKITEM = 5;
         private static int lai_exec_parse(int parse_mode, lai_state state)
         {
             lai_ctxitem ctxitem = lai_exec_peek_ctxstack_back(state);
@@ -770,10 +816,25 @@ namespace Cosmoss.Core
                         node_item.node_arg_modes = Compress(x);
 
                         state.stack_base[state.stack_base.Count - 1] = node_item;
+                        break;
                     }
+                case BUFFER_OP:
+                    {
+                        int data_pc = 0;
+                        int encoded_size = 0; // Size of the buffer initializer.
+                        if (lai_parse_varint(ref encoded_size, method, ref pc, limit))
+                            return 5;
+                        data_pc = pc;
+                        pc = opcode_pc + 1 + encoded_size;
+                        lai_exec_commit_pc(ref state, pc);
 
+                        var blkitem = lai_exec_push_blkstack(state);
+                        blkitem.pc = data_pc;
+                        blkitem.limit = opcode_pc + 1 + encoded_size;
 
-                    break;
+                        var buf_item = lai_exec_push_stack(state, LAI_BUFFER_STACKITEM);
+                        break;
+                    }
                 case SCOPE_OP:
                     {
                         int nested_pc;
@@ -1489,6 +1550,7 @@ namespace Cosmoss.Core
 
         public lai_nsnode handle;
         public int index;
+        internal byte[] buffer;
     }
     public class lai_invocation
     {
