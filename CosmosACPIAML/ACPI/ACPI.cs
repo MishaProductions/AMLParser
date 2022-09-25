@@ -1,10 +1,6 @@
-﻿using ACPIAML.ACPI.Interupter;
-using ACPILibs.AML;
-using ACPILibs.Parser2;
-using Cosmos.Core;
+﻿using Cosmos.Core;
 using Cosmos.Debug.Kernel;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -14,7 +10,7 @@ namespace Cosmoss.Core
     /// <summary>
     /// ACPI (Advanced Configuration and Power Interface) class.
     /// </summary>
-    public unsafe class ACPI
+    public unsafe partial class ACPI
     {
 
         /// <summary>
@@ -616,19 +612,7 @@ namespace Cosmoss.Core
                     Stream stream = new MemoryStream(dsdtBlock.ToArray());
 
                     Log("Create parser...");
-
-                    var root = new Parser(stream);
-
-                    Log("Parse first node...");
-
-                    //var node = root.Parse();
-                    //foreach (var item in node.Nodes)
-                    //{
-                    //    Log("Node: " + item.Name);
-                    //}
-                    Interupter i = new();
-                    i.AddTable(root);
-                    i.Start();
+                    lai_create_namespace();
                 }
 
             }
