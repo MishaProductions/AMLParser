@@ -614,6 +614,10 @@ namespace Cosmoss.Core
                     Log("Create parser...");
                     lai_create_namespace();
                 }
+                else
+                {
+                    Log("Invaild DSDT pointer");
+                }
 
             }
             else if (signature == "APIC")
