@@ -21,7 +21,7 @@
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <ExtractMapFile>True</ExtractMapFile>
         <StackCorruptionDetectionEnabled>False</StackCorruptionDetectionEnabled>
-        <DebugEnabled>False</DebugEnabled>
+        <DebugEnabled>True</DebugEnabled>
         <TraceMode>All</TraceMode>
     </PropertyGroup>
 

@@ -212,17 +212,17 @@ namespace Cosmoss.Core
         {
             while (lai_exec_peek_stack_back(state).vaild == 1)
             {
-                ////debug
-                //int i = 0;
-                //while (true)
-                //{
-                //    lai_stackitem trace_item = lai_exec_peek_stack(state, i);
-                //    if (trace_item.vaild == 0)
-                //        break;
+                //debug
+                int i = 0;
+                while (true)
+                {
+                    lai_stackitem trace_item = lai_exec_peek_stack(state, i);
+                    if (trace_item.vaild == 0)
+                        break;
 
-                //    lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
-                //    i++;
-                //}
+                    lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
+                    i++;
+                }
 
                 //todo
                 int e = lai_exec_process(state);
@@ -294,8 +294,10 @@ namespace Cosmoss.Core
 
             if (item.kind == LAI_POPULATE_STACKITEM)
             {
+                lai_log("Processing: LAI_POPULATE_STACKITEM");
                 if (block.pc == block.limit)
                 {
+                    Console.WriteLine("Reached the end");
                     lai_exec_pop_blkstack_back(ref state);
                     lai_exec_pop_ctxstack_back(ref state);
                     lai_exec_pop_stack_back(ref state);
@@ -332,6 +334,7 @@ namespace Cosmoss.Core
                 LAI_ENSURE(k <= 1, "lai_exec_process: LAI_BUFFER_STACKITEM: k<=1. opstackptr: " + state.opstack_ptr + ", frame: " + item.opstack_frame);
                 if (k == 1)
                 {
+                    lai_log("buffer op: found object in opstack");
                     var size = new lai_variable();
                     lai_operand operand = lai_exec_get_opstack(state, item.opstack_frame)[0];
                     size = operand.objectt;
@@ -362,6 +365,7 @@ namespace Cosmoss.Core
                 }
                 else
                 {
+                    lai_log("buffer op: we need more data!");
                     return lai_exec_parse(LAI_OBJECT_MODE, ref state);
                 }
             }
@@ -827,6 +831,25 @@ namespace Cosmoss.Core
                         }
                         break;
                     }
+                case ONE_OP:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+                        if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE)
+                        {
+                            var result = lai_exec_push_opstack(ref state);
+                            result.tag = LAI_OPERAND_OBJECT;
+                            result.objectt.type = LAI_INTEGER;
+                            result.objectt.integer = 1;
+                            state.opstack_base[state.opstack_base.Count - 1] = result;
+                        }
+                        else
+                        {
+                            lai_warn("One() in execution mode has no effect");
+                            LAI_ENSURE(parse_mode == LAI_EXEC_MODE, "parse_mode == LAI_EXEC_MODE");
+                        }
+
+                    }
+                    break;
                 case NOP_OP:
                     lai_exec_commit_pc(ref state, pc);
                     break;
@@ -1140,9 +1163,7 @@ namespace Cosmoss.Core
                         blkitem.limit = opcode_pc + 2 + encoded_size;
                         state.blkstack_base[state.blkstack_base.Count - 1] = blkitem;
 
-                        var item = lai_exec_push_stack(ref state, LAI_BUFFER_STACKITEM);
-                        item.opstack_frame = state.opstack_ptr;
-                        item.buf_want_result = (byte)want_result;
+                        var item = lai_exec_push_stack(ref state, LAI_POPULATE_STACKITEM);
                         state.stack_base[state.stack_base.Count - 1] = item;
                         break;
                     }
