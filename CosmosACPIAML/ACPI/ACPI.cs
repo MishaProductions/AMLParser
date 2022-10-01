@@ -47,7 +47,7 @@ namespace Cosmoss.Core
             /// <summary>
             /// RSDT Address
             /// </summary>
-            public int RsdtAddress;
+            public uint RsdtAddress;
         };
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -518,14 +518,14 @@ namespace Cosmoss.Core
             var rsdp = RSDPAddress();
             var ptr = (byte*)rsdp;
 
-            Global.mDebugger.Send("ACPI v" + rsdp->Revision);
+            Console.WriteLine("ACPI v" + rsdp->Revision);
 
             var rsdt = (AcpiHeader*)rsdp->RsdtAddress;
             ptr = (byte*)rsdt;
 
             var p = (uint*)(rsdt + 1);
             var end = (uint*)((byte*)rsdt + rsdt->Length);
-
+            Console.WriteLine("p=" + (int)p + ",end=" + (int)end+",len="+ rsdt->Length);
             while (p < end)
             {
                 var address = *p++;

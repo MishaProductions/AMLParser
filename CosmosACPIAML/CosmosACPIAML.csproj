@@ -23,6 +23,9 @@
         <StackCorruptionDetectionEnabled>False</StackCorruptionDetectionEnabled>
         <DebugEnabled>True</DebugEnabled>
         <TraceMode>All</TraceMode>
+        <VMWareEdition>Player</VMWareEdition>
+        <CompileVBEMultiboot>False</CompileVBEMultiboot>
+        <VBEResolution></VBEResolution>
     </PropertyGroup>
 
     <ItemGroup>
