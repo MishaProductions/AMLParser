@@ -1,4 +1,5 @@
-﻿using Cosmos.HAL;
+﻿using Cosmos.Core;
+using Cosmos.HAL;
 using Cosmos.HAL.Debug;
 using Cosmos.HAL.Drivers;
 using Cosmos.System.Graphics;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Net.Http.Headers;
 using System.Text;
+using ACPI = Cosmoss.Core.ACPI;
 using Sys = Cosmos.System;
 
 namespace CosmosACPIAMl
@@ -45,13 +47,19 @@ namespace CosmosACPIAMl
             PCI.Setup();
             Console.WriteLine("Starting ACPI");
             mDebugger.Send("ACPI Init");
+            foreach (var item in CPU.GetMemoryMap())
+            {
+                var x = $"Address: {item.Address}, Length: {item.Length}, Type: {item.Type}";
+                Console.WriteLine(x);
+                Serial.SendString(x+ "\n");
+            }
             try
             {
                 ACPI.Start();
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                Console.WriteLine("ACPI Start error: "+e.Message);
+                Console.WriteLine("ACPI Start error: " + e.Message);
             }
             Console.WriteLine("ACPI init done");
 

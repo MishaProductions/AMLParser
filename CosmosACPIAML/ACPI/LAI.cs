@@ -345,7 +345,10 @@ namespace Cosmoss.Core
                     if (trace_item == null)
                         break;
 
-                    lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
+                    if (trace_item.kind == LAI_OP_STACKITEM)
+                        lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
+                    else
+                        lai_log($"stack item {i} is of type {trace_item.kind}");
                     i++;
                 }
 
@@ -385,7 +388,6 @@ namespace Cosmoss.Core
         }
         private static void lai_exec_pop_opstack_back(ref lai_state state)
         {
-            lai_log("maybe broken function: lai_exec_pop_opstack_back");
             state.opstack_ptr--;
             state.opstack_base.RemoveAt(state.opstack_base.Count - 1);
         }
@@ -555,7 +557,7 @@ namespace Cosmoss.Core
             else if (item.kind == LAI_NODE_STACKITEM)
             {
                 int k = state.opstack_ptr - item.opstack_frame;
-                lai_log("k is " + k);
+                lai_log("k is " + k + ", opstackptr: " + state.opstack_ptr + ",frame=" + item.opstack_frame + ",val=" + item.node_arg_modes[k]);
                 if (item.node_arg_modes[k] == 0)
                 {
                     lai_operand[] operands = lai_exec_get_opstack(state, item.opstack_frame);
@@ -819,9 +821,8 @@ namespace Cosmoss.Core
 
             int pc = block.pc;
             int limit = block.limit;
+            lai_log("=====");
             lai_log("PARSING NEW OPCODE");
-            lai_log("****PC: " + block.pc + "****");
-            lai_log("****OPSTACK_PTR SIZE: " + state.opstack_ptr);
 
             // Package-size encoding (and similar) needs to know the PC of the opcode.
             // If an opcode sequence contains a pkgsize, the sequence generally ends at:
@@ -888,8 +889,10 @@ namespace Cosmoss.Core
                 lai_log("parsing name " + path + " at " + pc);
                 if (parse_mode == LAI_DATA_MODE)
                 {
+                    lai_log("aa");
                     if (want_result != 0)
                     {
+                        lai_log("a");
                         var opstack_res = lai_exec_push_opstack(ref state);
                         opstack_res.tag = LAI_OPERAND_OBJECT;
                         opstack_res.objectt.type = LAI_LAZY_HANDLE;
@@ -901,8 +904,10 @@ namespace Cosmoss.Core
                 }
                 else if ((ReadFlags(parse_mode) & LAI_MF_RESOLVE) == 0)
                 {
+                    lai_log("bb,parsemode=" + parse_mode);
                     if (want_result != 0)
                     {
+                        lai_log("b");
                         var opstack_res = lai_exec_push_opstack(ref state);
                         opstack_res.tag = LAI_UNRESOLVED_NAME;
                         opstack_res.unres_ctx_handle = ctx_handle;
@@ -915,9 +920,11 @@ namespace Cosmoss.Core
                 }
                 else
                 {
+                    lai_log("cc");
                     lai_nsnode handle = lai_do_resolve(ctx_handle, ref amln);
                     if (handle == null)
                     {
+                        lai_log("c");
                         if ((ReadFlags(parse_mode) & LAI_MF_NULLABLE) != 0)
                         {
                             lai_log("parsing non-existant name: " + path);
@@ -937,6 +944,7 @@ namespace Cosmoss.Core
                     }
                     else if (handle.type == LAI_NAMESPACE_METHOD && (ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0)
                     {
+                        lai_log("d");
                         lai_stackitem node_item = lai_exec_push_stack(ref state, LAI_INVOKE_STACKITEM);
                         node_item.opstack_frame = state.opstack_ptr;
                         node_item.ivk_argc = handle.method_flags & METHOD_ARGC_MASK;
@@ -950,6 +958,7 @@ namespace Cosmoss.Core
                     }
                     else if ((ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0)
                     {
+                        lai_log("e");
                         // TODO: Get rid of this case again!
                         lai_log("parsing name " + path);
                         lai_panic("Case not converted to C#: (ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0");
@@ -965,6 +974,7 @@ namespace Cosmoss.Core
                     }
                     else
                     {
+                        lai_log("f");
                         lai_log("parsing name " + path + " using the else statement");
 
                         if (want_result != 0)
@@ -1222,7 +1232,6 @@ namespace Cosmoss.Core
                         }
                         int nested_pc = pc;
                         pc = opcode_pc + 1 + encoded_size;
-                        lai_log("opstack sizing: " + state.opstack_base.Count);
                         lai_exec_commit_pc(ref state, pc);
                         lai_nsnode node = new lai_nsnode();
                         node.type = LAI_NAMESPACE_METHOD;
@@ -1852,7 +1861,7 @@ namespace Cosmoss.Core
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("LAI PANIC: " + error);
             Console.WriteLine("This is a critical error. Press the ENTER key to skip. Not Recommended");
-            // Serial.SendString("LAI ERROR: " + error);
+             Serial.SendString("LAI ERROR: " + error);
             Console.ForegroundColor = ConsoleColor.White;
             Console.ReadLine();
         }
@@ -1861,14 +1870,14 @@ namespace Cosmoss.Core
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("WARN: " + warn);
             Console.ForegroundColor = ConsoleColor.White;
-            // Serial.SendString("LAI WARN: " + warn);
+             Serial.SendString("LAI WARN: " + warn);
             Cosmos.System.Kernel.PrintDebug("LAI: WARN: " + warn);
         }
         private static void lai_log(string msg)
         {
             Console.WriteLine("LAI: " + msg);
             Kernel.PrintDebug("LAI: " + msg);
-            //Serial.SendString("LAI: " + msg);
+            Serial.SendString("LAI: " + msg);
         }
     }
 

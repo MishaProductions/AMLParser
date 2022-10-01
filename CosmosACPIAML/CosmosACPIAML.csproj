@@ -21,7 +21,7 @@
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <ExtractMapFile>True</ExtractMapFile>
         <StackCorruptionDetectionEnabled>False</StackCorruptionDetectionEnabled>
-        <DebugEnabled>True</DebugEnabled>
+        <DebugEnabled>False</DebugEnabled>
         <TraceMode>All</TraceMode>
         <VMWareEdition>Player</VMWareEdition>
         <CompileVBEMultiboot>False</CompileVBEMultiboot>

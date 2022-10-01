@@ -516,15 +516,21 @@ namespace Cosmoss.Core
         {
             IOAPIC = null;
             var rsdp = RSDPAddress();
+            if (rsdp == null)
+            {
+                Console.WriteLine("ACPI does not exist on this machine");
+                return false;
+            }
             var ptr = (byte*)rsdp;
 
             Console.WriteLine("ACPI v" + rsdp->Revision);
-
+            Console.WriteLine("RSDP ptr: " + (uint)rsdp);
             var rsdt = (AcpiHeader*)rsdp->RsdtAddress;
             ptr = (byte*)rsdt;
 
             var p = (uint*)(rsdt + 1);
             var end = (uint*)((byte*)rsdt + rsdt->Length);
+            Console.WriteLine("RSDT ptr: " + (uint)rsdt);
             Console.WriteLine("p=" + (int)p + ",end=" + (int)end+",len="+ rsdt->Length);
             while (p < end)
             {
@@ -596,8 +602,8 @@ namespace Cosmoss.Core
                 pm1bIO = new IOPort((ushort)PM1b_CNT);
                 ResetRegister = new IOPort((ushort)FADT->ResetReg.Address);
                 Console.WriteLine("DSDT addr: " + FADT->Dsdt);
-                if (acpiCheckHeader((byte*)FADT->Dsdt, "DSDT") == 0)
-                {
+                //if (acpiCheckHeader((byte*)FADT->Dsdt, "DSDT") == 0)
+                //{
                     Log("Found valid DSDT");
                     //uint dsdtAddress = FADT->Dsdt;
                     //uint dsdtLength = (uint)(*((int*)FADT->Dsdt + 1) - sizeof(AcpiHeader));
@@ -613,11 +619,11 @@ namespace Cosmoss.Core
 
                     Log("Create parser...");
                     lai_create_namespace();
-                }
-                else
-                {
-                    Log("Invaild DSDT pointer");
-                }
+                //}
+                //else
+                //{
+                //    Log("Invaild DSDT pointer");
+                //}
 
             }
             else if (signature == "APIC")
@@ -693,26 +699,43 @@ namespace Cosmoss.Core
         /// <returns>uint value.</returns>
         private static unsafe RSDPtr* RSDPAddress()
         {
-            for (uint addr = 0xE0000; addr < 0x100000; addr += 4)
-            {
-                if (Compare("RSD PTR ", (byte*)addr) == 0)
-                {
-                    if (Check_RSD(addr))
-                    {
-                        return (RSDPtr*)addr;
-                    }
-                }
-            }
+            //for (uint addr = 0xE0000; addr < 0x100000; addr += 4)
+            //{
+            //    if (Compare("RSD PTR ", (byte*)addr) == 0)
+            //    {
+            //        if (Check_RSD(addr))
+            //        {
+            //            return (RSDPtr*)addr;
+            //        }
+            //    }
+            //}
 
-            var ebda_address = *(uint*)0x040E;
-            ebda_address = ebda_address * 0x10 & 0x000fffff;
+            //var ebda_address = *(uint*)0x040E;
+            //ebda_address = ebda_address * 0x10 & 0x000fffff;
 
-            for (var addr = ebda_address; addr < ebda_address + 1024; addr += 4)
+            //for (var addr = ebda_address; addr < ebda_address + 1024; addr += 4)
+            //{
+            //    if (Compare("RSD PTR ", (byte*)addr) == 0)
+            //    {
+            //        return (RSDPtr*)addr;
+            //    }
+            //}
+
+            //return null;
+
+            byte* p = (byte*)0xE0000;
+            byte* end = (byte*)0xFFFFF;
+
+            while (p < end)
             {
-                if (Compare("RSD PTR ", (byte*)addr) == 0)
+                ulong signature = *(ulong*)p;
+
+                if (signature == 0x2052545020445352) // 'RSD PTR '
                 {
-                    return (RSDPtr*)addr;
+                    return (RSDPtr*)p;
                 }
+
+                p += 16;
             }
 
             return null;
