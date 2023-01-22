@@ -1,5 +1,5 @@
 ﻿using Cosmos.Core;
-using Cosmos.HAL.Debug;
+using Cosmos.HAL;
 using CosmosACPIAMl;
 using System;
 using System.Collections.Generic;
@@ -1861,7 +1861,7 @@ namespace Cosmoss.Core
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("LAI PANIC: " + error);
             Console.WriteLine("This is a critical error. Press the ENTER key to skip. Not Recommended");
-             Serial.SendString("LAI ERROR: " + error);
+            SerialPort.SendString("LAI ERROR: " + error);
             Console.ForegroundColor = ConsoleColor.White;
             Console.ReadLine();
         }
@@ -1870,14 +1870,14 @@ namespace Cosmoss.Core
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("WARN: " + warn);
             Console.ForegroundColor = ConsoleColor.White;
-             Serial.SendString("LAI WARN: " + warn);
+            SerialPort.SendString("LAI WARN: " + warn);
             Cosmos.System.Kernel.PrintDebug("LAI: WARN: " + warn);
         }
         private static void lai_log(string msg)
         {
             Console.WriteLine("LAI: " + msg);
             Kernel.PrintDebug("LAI: " + msg);
-            Serial.SendString("LAI: " + msg);
+            SerialPort.SendString("LAI: " + msg);
         }
     }
 

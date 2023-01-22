@@ -1,15 +1,6 @@
 ﻿using Cosmos.Core;
 using Cosmos.HAL;
-using Cosmos.HAL.Debug;
-using Cosmos.HAL.Drivers;
-using Cosmos.System.Graphics;
-using Cosmos.System.Graphics.Fonts;
-using Cosmoss.Core;
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Net.Http.Headers;
-using System.Text;
 using ACPI = Cosmoss.Core.ACPI;
 using Sys = Cosmos.System;
 
@@ -17,7 +8,6 @@ namespace CosmosACPIAMl
 {
     public class Kernel : Sys.Kernel
     {
-        public static CosmosACPIAML.Console AConsole;
         protected override void BeforeRun()
         {
             Console.WriteLine("Cosmos booted successfully. Type a line of text to get it echoed back.");
@@ -51,7 +41,7 @@ namespace CosmosACPIAMl
             {
                 var x = $"Address: {item.Address}, Length: {item.Length}, Type: {item.Type}";
                 Console.WriteLine(x);
-                Serial.SendString(x+ "\n");
+                SerialPort.SendString(x + "\n");
             }
             try
             {
