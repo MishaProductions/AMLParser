@@ -1,4 +1,5 @@
 ﻿using Cosmos.Core;
+using Cosmos.Core.Multiboot;
 using Cosmos.Debug.Kernel;
 using System;
 using System.IO;
@@ -514,7 +515,7 @@ namespace Cosmoss.Core
             var rsdp = RSDPAddress();
             if (rsdp == null)
             {
-                Console.WriteLine("ACPI does not exist on this machine");
+                Console.WriteLine("Failed to find pointer to acpi RSDP");
                 return false;
             }
             var ptr = (byte*)rsdp;
@@ -683,29 +684,29 @@ namespace Cosmoss.Core
         /// <returns>uint value.</returns>
         private static unsafe RSDPtr* RSDPAddress()
         {
-            //for (uint addr = 0xE0000; addr < 0x100000; addr += 4)
-            //{
-            //    if (Compare("RSD PTR ", (byte*)addr) == 0)
-            //    {
-            //        if (Check_RSD(addr))
-            //        {
-            //            return (RSDPtr*)addr;
-            //        }
-            //    }
-            //}
+            for (uint addr = 0xE0000; addr < 0x100000; addr += 4)
+            {
+                if (Compare("RSD PTR ", (byte*)addr) == 0)
+                {
+                    if (Check_RSD(addr))
+                    {
+                        return (RSDPtr*)addr;
+                    }
+                }
+            }
 
-            //var ebda_address = *(uint*)0x040E;
-            //ebda_address = ebda_address * 0x10 & 0x000fffff;
+            var ebda_address = *(uint*)0x040E;
+            ebda_address = ebda_address * 0x10 & 0x000fffff;
 
-            //for (var addr = ebda_address; addr < ebda_address + 1024; addr += 4)
-            //{
-            //    if (Compare("RSD PTR ", (byte*)addr) == 0)
-            //    {
-            //        return (RSDPtr*)addr;
-            //    }
-            //}
+            for (var addr = ebda_address; addr < ebda_address + 1024; addr += 4)
+            {
+                if (Compare("RSD PTR ", (byte*)addr) == 0)
+                {
+                    return (RSDPtr*)addr;
+                }
+            }
 
-            //return null;
+            return null;
 
             byte* p = (byte*)0xE0000;
             byte* end = (byte*)0xFFFFF;

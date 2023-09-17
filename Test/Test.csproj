@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ACPIAML\ACPIAML.csproj" />
+    <ProjectReference Include="..\CosmosACPIAML\CosmosACPIAML.csproj" />
   </ItemGroup>
 
   <ItemGroup>

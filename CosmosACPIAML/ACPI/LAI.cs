@@ -284,23 +284,23 @@ namespace Cosmoss.Core
             lai_populate(RootNode, tb, state);
             lai_finalize_state(state);
 
+            //TODO: port load ssdt and psdt code
+
             lai_log("lai_create_namespace finished");
         }
         private static void lai_finalize_state(lai_state state)
         {
-            while (state.ctxstack_ptr >= 0)
+            while ((state.ctxstack_base.Count - 1) >= 0)
                 lai_exec_pop_ctxstack_back(ref state);
-            while (state.blkstack_ptr >= 0)
+            while ((state.blkstack_base.Count - 1) >= 0)
                 lai_exec_pop_blkstack_back(ref state);
-            while (state.stack_ptr >= 0)
+            while ((state.stack_base.Count - 1) >= 0)
                 lai_exec_pop_stack_back(ref state);
-            lai_exec_pop_opstack(ref state, state.opstack_ptr);
+            lai_exec_pop_opstack(ref state, (state.opstack_base.Count));
         }
         private static void lai_populate(lai_nsnode parent, lai_aml_segment amls, lai_state state)
         {
             var size = amls.table->header.Length - sizeof(AcpiHeader);
-            lai_ctxitem populate_ctxitem = lai_exec_push_ctxstack(ref state);
-            populate_ctxitem.amls = amls;
 
             //<cosmos>
             uint dsdtAddress = FADT->Dsdt;
@@ -312,18 +312,16 @@ namespace Cosmoss.Core
             ReadHeader(_reader);
 
             var dsdtBlock = new MemoryBlock08(dsdtAddress + 36, SdtLength);
-            lai_log("The DSDT is located at " + FADT->Dsdt);
-            Stream stream = new MemoryStream(dsdtBlock.ToArray());
-
+            lai_log("The DSDT is located at " + FADT->Dsdt + ",and length is " + dsdtLength);
+            var dsdtBytes = dsdtBlock.ToArray();
+            lai_log("The amount of bytes read is " + dsdtBytes.Length);
             //</cosmos>
+     
 
-            //  Kernel.PrintDebug(Convert.ToBase64String(dsdtBlock.ToArray()));
-
-            populate_ctxitem.code = dsdtBlock.ToArray();
-            populate_ctxitem.handle = parent;
+            lai_ctxitem populate_ctxitem = lai_exec_push_ctxstack(ref state, amls, dsdtBytes, parent, null); ;
 
             var blkitem = lai_exec_push_blkstack(ref state, 0, (int)size);
-
+            Kernel.PrintDebug(Convert.ToBase64String(dsdtBytes));
             lai_exec_push_stack(ref state, LAI_POPULATE_STACKITEM);
 
             int status = lai_exec_run(state);
@@ -362,18 +360,15 @@ namespace Cosmoss.Core
         }
         private static void lai_exec_pop_blkstack_back(ref lai_state state)
         {
-            state.blkstack_ptr--;
             state.blkstack_base.RemoveAt(state.blkstack_base.Count - 1);
         }
         private static void lai_exec_pop_ctxstack_back(ref lai_state state)
         {
-            state.ctxstack_ptr--;
             state.ctxstack_base.RemoveAt(state.ctxstack_base.Count - 1);
         }
         private static void lai_exec_pop_stack_back(ref lai_state state)
         {
-            //// Removes the last item from the stack.
-            state.stack_ptr--;
+            // Removes the last item from the stack.
             state.stack_base.RemoveAt(state.stack_base.Count - 1);
         }
         private static void lai_exec_pop_opstack(ref lai_state state, int n)
@@ -382,14 +377,11 @@ namespace Cosmoss.Core
             //lai_log("lai_exec_pop_opstack() enter");
             //Console.WriteLine("popping opstack. n=" + n + ",sz: " + state.stack_base.Count);
             lai_log("lai_exec_pop_opstack: n: " + n + ", itms: " + state.opstack_base.Count);
-            state.opstack_ptr -= n;
             state.opstack_base.RemoveRange(state.opstack_base.Count - n, n);
-            if (state.opstack_ptr != state.opstack_base.Count) { throw new Exception("opstackptr is inconsistent"); }
             //lai_log("lai_exec_pop_opstack() end");
         }
         private static void lai_exec_pop_opstack_back(ref lai_state state)
         {
-            state.opstack_ptr--;
             state.opstack_base.RemoveAt(state.opstack_base.Count - 1);
         }
         private static int lai_exec_process(lai_state state)
@@ -416,6 +408,11 @@ namespace Cosmoss.Core
 
             if (block.pc > block.limit)
             {
+                lai_log("stack dump before crash:");
+                foreach (var b in state.stack_base)
+                {
+                    lai_log($"k: {b.kind}, {b.op_opcode}");
+                }
                 lai_panic($"execution escaped out of code range. pc: " + block.pc + ", limit: " + block.limit);
             }
             //lai_log("lai_exec_process: pc: " + block.pc + ",limit=" + block.limit);
@@ -444,9 +441,9 @@ namespace Cosmoss.Core
             }
             else if (item.kind == LAI_BUFFER_STACKITEM)
             {
-                int k = state.opstack_ptr - item.opstack_frame;
+                int k = (state.opstack_base.Count) - item.opstack_frame;
 
-                LAI_ENSURE(k <= 1, "lai_exec_process: LAI_BUFFER_STACKITEM: k<=1. opstackptr: " + state.opstack_ptr + ", frame: " + item.opstack_frame);
+                LAI_ENSURE(k <= 1, "lai_exec_process: LAI_BUFFER_STACKITEM: k<=1. opstackptr: " + (state.opstack_base.Count) + ", frame: " + item.opstack_frame);
                 if (k == 1)
                 {
                     lai_log("buffer op: found object in opstack");
@@ -516,7 +513,7 @@ namespace Cosmoss.Core
                     return 0;
                 }
 
-                if (state.opstack_ptr == item.opstack_frame + 2)
+                if ((state.opstack_base.Count) == item.opstack_frame + 2)
                 {
                     lai_operand package = frame[0];
                     LAI_ENSURE(package.tag == LAI_OPERAND_OBJECT, "frame[0] must be an object operand");
@@ -536,9 +533,9 @@ namespace Cosmoss.Core
                     state.stack_base[state.stack_base.Count - 1] = item;
                     lai_exec_pop_opstack_back(ref state);
                 }
-                lai_log("opstackptr: " + state.opstack_ptr + ", opstack cnt: " + state.opstack_base.Count);
+                lai_log("opstackptr: " + (state.opstack_base.Count) + ", opstack cnt: " + state.opstack_base.Count);
                 lai_log("opstack_frame: " + item.opstack_frame);
-                LAI_ENSURE(state.opstack_ptr == item.opstack_frame + 1, "state->opstack_ptr == item->opstack_frame + 1");
+                LAI_ENSURE((state.opstack_base.Count) == item.opstack_frame + 1, "state->opstack_ptr == item->opstack_frame + 1");
                 if (block.pc == block.limit)
                 {
                     if (item.pkg_want_result == 0)
@@ -557,8 +554,8 @@ namespace Cosmoss.Core
             }
             else if (item.kind == LAI_NODE_STACKITEM)
             {
-                int k = state.opstack_ptr - item.opstack_frame;
-                lai_log("k is " + k + ", opstackptr: " + state.opstack_ptr + ",frame=" + item.opstack_frame + ",val=" + item.node_arg_modes[k]);
+                int k = (state.opstack_base.Count) - item.opstack_frame;
+                lai_log("k is " + k + ", opstackptr: " + (state.opstack_base.Count) + ",frame=" + item.opstack_frame + ",val=" + item.node_arg_modes[k]);
                 if (item.node_arg_modes[k] == 0)
                 {
                     lai_operand[] operands = lai_exec_get_opstack(state, item.opstack_frame);
@@ -784,7 +781,7 @@ namespace Cosmoss.Core
         }
         private static lai_operand[] lai_exec_get_opstack(lai_state state, int n)
         {
-            if (n < state.opstack_ptr)
+            if (n < (state.opstack_base.Count))
             {
 
             }
@@ -822,7 +819,7 @@ namespace Cosmoss.Core
 
             int pc = block.pc;
             int limit = block.limit;
-            lai_log("=====");
+            lai_log("\n");
             lai_log("PARSING NEW OPCODE");
 
             // Package-size encoding (and similar) needs to know the PC of the opcode.
@@ -837,7 +834,7 @@ namespace Cosmoss.Core
 
             if (!(pc < block.limit))
             {
-                lai_panic($"execution escaped out of code range. pc: " + block.pc + ", limit: " + block.limit);
+                lai_panic($"execution escaped out of code range. pc: " + table_pc + ", limit: " + table_limit_pc);
             }
 
             // Whether we use the result of an expression or not.
@@ -947,7 +944,7 @@ namespace Cosmoss.Core
                     {
                         lai_log("d");
                         lai_stackitem node_item = lai_exec_push_stack(ref state, LAI_INVOKE_STACKITEM);
-                        node_item.opstack_frame = state.opstack_ptr;
+                        node_item.opstack_frame = (state.opstack_base.Count);
                         node_item.ivk_argc = handle.method_flags & METHOD_ARGC_MASK;
                         node_item.ivk_want_result = (byte)want_result;
                         state.stack_base[state.stack_base.Count - 1] = node_item;
@@ -1128,7 +1125,7 @@ namespace Cosmoss.Core
                         lai_exec_commit_pc(ref state, pc);
                         lai_stackitem node_item = lai_exec_push_stack(ref state, LAI_NODE_STACKITEM);
                         node_item.node_opcode = opcode;
-                        node_item.opstack_frame = state.opstack_ptr;
+                        node_item.opstack_frame = (state.opstack_base.Count);
 
                         byte[] x = new byte[8];
                         x[0] = LAI_UNRESOLVED_MODE;
@@ -1169,7 +1166,7 @@ namespace Cosmoss.Core
                         lai_exec_push_blkstack(ref state, data_pc, opcode_pc + 1 + encoded_size);
 
                         lai_stackitem pkg_item = lai_exec_push_stack(ref state, LAI_PACKAGE_STACKITEM);
-                        pkg_item.opstack_frame = state.opstack_ptr;
+                        pkg_item.opstack_frame = (state.opstack_base.Count);
                         pkg_item.pkg_index = 0;
                         pkg_item.pkg_want_result = (byte)want_result;
                         pkg_item.pkg_phase = 0;
@@ -1206,11 +1203,7 @@ namespace Cosmoss.Core
                             return 7;
                         }
 
-                        var populate_ctxitem = lai_exec_push_ctxstack(ref state);
-                        populate_ctxitem.amls = amls;
-                        populate_ctxitem.code = method;
-                        populate_ctxitem.handle = scoped_ctx_handle;
-                        state.ctxstack_base[state.ctxstack_base.Count - 1] = populate_ctxitem;
+                        lai_exec_push_ctxstack(ref state, amls, method, scoped_ctx_handle, null);
 
                         lai_exec_push_blkstack(ref state, nested_pc, opcode_pc + 1 + encoded_size);
                         var sz = opcode_pc + 1 + encoded_size;
@@ -1250,7 +1243,7 @@ namespace Cosmoss.Core
                         lai_exec_commit_pc(ref state, pc);
                         lai_stackitem node_item = lai_exec_push_stack(ref state, LAI_NODE_STACKITEM);
                         node_item.node_opcode = opcode;
-                        node_item.opstack_frame = state.opstack_ptr;
+                        node_item.opstack_frame = (state.opstack_base.Count);
 
                         byte[] b = new byte[8];
                         b[0] = LAI_UNRESOLVED_MODE;
@@ -1364,11 +1357,7 @@ namespace Cosmoss.Core
 
                         //todo invocation
 
-                        var populate_ctxitem = lai_exec_push_ctxstack(ref state);
-                        populate_ctxitem.amls = amls;
-                        populate_ctxitem.code = method;
-                        populate_ctxitem.handle = node;
-                        state.ctxstack_base[state.ctxstack_base.Count - 1] = populate_ctxitem;
+                        lai_exec_push_ctxstack(ref state, amls, method, node, null);
 
                         int sz = opcode_pc + 2 + encoded_size;
                         lai_exec_push_blkstack(ref state, nested_pc, opcode_pc + 2 + encoded_size);
@@ -1406,11 +1395,7 @@ namespace Cosmoss.Core
                         lai_install_nsnode(node);
                         //todo invocation
 
-                        var populate_ctxitem = lai_exec_push_ctxstack(ref state);
-                        populate_ctxitem.amls = amls;
-                        populate_ctxitem.code = method;
-                        populate_ctxitem.handle = node;
-                        state.ctxstack_base[state.ctxstack_base.Count - 1] = populate_ctxitem;
+                        lai_exec_push_ctxstack(ref state, amls, method, node, null);
 
                         lai_exec_push_blkstack(ref state, nested_pc, opcode_pc + 2 + pkgsize);
                         lai_exec_push_stack(ref state, LAI_POPULATE_STACKITEM);
@@ -1732,14 +1717,14 @@ namespace Cosmoss.Core
         }
         private static lai_blkitem lai_exec_peek_blkstack_back(lai_state state)
         {
-            if (state.ctxstack_ptr < 0)
+            if ((state.ctxstack_base.Count - 1) < 0)
                 return null;
 
             return state.blkstack_base[state.blkstack_base.Count - 1];
         }
         private static lai_ctxitem lai_exec_peek_ctxstack_back(lai_state state)
         {
-            if (state.ctxstack_ptr < 0)
+            if ((state.ctxstack_base.Count - 1) < 0)
                 return null;
 
             return state.ctxstack_base[state.ctxstack_base.Count - 1];
@@ -1762,7 +1747,7 @@ namespace Cosmoss.Core
         /// <exception cref="NotImplementedException"></exception>
         private static lai_stackitem lai_exec_peek_stack(lai_state state, int n)
         {
-            if (state.stack_ptr - n < 0)
+            if ((state.stack_base.Count - 1) - n < 0)
             {
                 return null;
             }
@@ -1770,28 +1755,25 @@ namespace Cosmoss.Core
         }
         private static lai_stackitem lai_exec_push_stack(ref lai_state state, int kind = 0)
         {
-            state.stack_ptr++;
             state.stack_base.Add(new lai_stackitem() { vaild = 1, kind = kind });
 
             return state.stack_base[state.stack_base.Count - 1];
         }
         private static lai_blkitem lai_exec_push_blkstack(ref lai_state state, int pc, int limit)
         {
-            state.blkstack_ptr++;
             state.blkstack_base.Add(new lai_blkitem() { pc = pc, limit = limit });
 
             return state.blkstack_base[state.blkstack_base.Count - 1];
         }
-        private static lai_ctxitem lai_exec_push_ctxstack(ref lai_state state)
+        private static lai_ctxitem lai_exec_push_ctxstack(ref lai_state state, lai_aml_segment seg, byte[] code, lai_nsnode handle, lai_invocation inno)
         {
-            state.ctxstack_ptr++;
-            state.ctxstack_base.Add(new lai_ctxitem());
+            var x = new lai_ctxitem() { amls = seg, code = code, handle = handle, invocation = inno };
+            state.ctxstack_base.Add(x);
 
-            return state.ctxstack_base[state.ctxstack_base.Count - 1];
+            return x;
         }
         public static lai_operand lai_exec_push_opstack(ref lai_state state)
         {
-            state.opstack_ptr++;
             state.opstack_base.Add(new lai_operand() { objectt = new lai_variable() });
 
             return state.opstack_base[state.opstack_base.Count - 1];
@@ -1875,8 +1857,16 @@ namespace Cosmoss.Core
         }
         private static void lai_log(string msg)
         {
-            Console.WriteLine("LAI: " + msg);
-            Kernel.PrintDebug("LAI: " + msg);
+            if (msg == "\n")
+            {
+                Console.WriteLine(msg);
+                Kernel.PrintDebug(msg);
+            }
+            else
+            {
+                Console.WriteLine("LAI: " + msg);
+                Kernel.PrintDebug("LAI: " + msg);
+            }
             //SerialPort.SendString("LAI: " + msg);
         }
     }
@@ -1969,11 +1959,7 @@ namespace Cosmoss.Core
         public List<lai_blkitem> blkstack_base = new List<lai_blkitem>();
         public List<lai_stackitem> stack_base = new List<lai_stackitem>();
         public List<lai_operand> opstack_base = new List<lai_operand>();
-        //...
-        public int ctxstack_ptr = -1; // Stack to track the current context.
-        public int blkstack_ptr = -1; // Stack to track the current block.
-        public int stack_ptr = -1;  // Stack to track the current execution state.
-        public int opstack_ptr;
+        //TODO
     }
 
     public class lai_stackitem
