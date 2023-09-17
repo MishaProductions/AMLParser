@@ -21,17 +21,20 @@
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <ExtractMapFile>True</ExtractMapFile>
         <StackCorruptionDetectionEnabled>False</StackCorruptionDetectionEnabled>
-        <DebugEnabled>False</DebugEnabled>
+        <DebugEnabled>True</DebugEnabled>
         <TraceMode>All</TraceMode>
         <VMWareEdition>Player</VMWareEdition>
         <CompileVBEMultiboot>False</CompileVBEMultiboot>
         <VBEResolution></VBEResolution>
+        <OptimizationLevel>3</OptimizationLevel>
+        <RemoveBootDebugOutput>True</RemoveBootDebugOutput>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Cosmos.Build" Version="0-*" NoWarn="NU1604" />
         <PackageReference Include="Cosmos.Debug.Kernel" Version="0-*" NoWarn="NU1604" />
         <PackageReference Include="Cosmos.System2" Version="0-*" NoWarn="NU1604" />
+		<PackageReference Include="Cosmos.Plugs" Version="0-*" NoWarn="NU1604" />
     </ItemGroup>
 
     <ItemGroup>

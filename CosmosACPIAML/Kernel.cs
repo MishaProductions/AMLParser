@@ -36,12 +36,14 @@ namespace CosmosACPIAMl
             Console.WriteLine("Starting PCI");
             PCI.Setup();
             Console.WriteLine("Starting ACPI");
+            //SerialPort.Enable(SerialPort.COM1);
             mDebugger.Send("ACPI Init");
             foreach (var item in CPU.GetMemoryMap())
             {
                 var x = $"Address: {item.Address}, Length: {item.Length}, Type: {item.Type}";
+                mDebugger.Send(x);
                 Console.WriteLine(x);
-                SerialPort.SendString(x + "\n");
+                //SerialPort.SendString(x + "\n");
             }
             try
             {

@@ -16,7 +16,7 @@ namespace Cosmoss.Core
         /// <summary>
         /// Debugger instance at the System ring, of the Global section.
         /// </summary>
-        public static readonly Debugger mDebugger = new Debugger("System", "Global");
+        //public static readonly Debugger mDebugger = new Debugger("System", "Global");
 
         /// <summary>
         /// RSD table struct.
@@ -542,35 +542,35 @@ namespace Cosmoss.Core
 
         private static void ReadHeader(BinaryReader _reader)
         {
-            Global.mDebugger.Send("SDT header:");
+            Global.debugger.Send("SDT header:");
 
             //Signature
-            Global.mDebugger.Send("\tSignature: " + Encoding.ASCII.GetString(_reader.ReadBytes(4)));
+            Global.debugger.Send("\tSignature: " + Encoding.ASCII.GetString(_reader.ReadBytes(4)));
 
             //Length
             SdtLength = _reader.ReadUInt32();
-            Global.mDebugger.Send("\tLendth: " + SdtLength.ToString());
+            Global.debugger.Send("\tLendth: " + SdtLength.ToString());
 
             //Revision
-            Global.mDebugger.Send("\tRevision: " + _reader.ReadByte().ToString());
+            Global.debugger.Send("\tRevision: " + _reader.ReadByte().ToString());
 
             //Checksum
-            Global.mDebugger.Send("\tChecksum: " + _reader.ReadByte().ToString());
+            Global.debugger.Send("\tChecksum: " + _reader.ReadByte().ToString());
 
             //OEM ID
-            Global.mDebugger.Send("\tOEM ID: " + Encoding.ASCII.GetString(_reader.ReadBytes(6)));
+            Global.debugger.Send("\tOEM ID: " + Encoding.ASCII.GetString(_reader.ReadBytes(6)));
 
             //OEMTableID
-            Global.mDebugger.Send("\tOEMTableID: " + Encoding.ASCII.GetString(_reader.ReadBytes(8)));
+            Global.debugger.Send("\tOEMTableID: " + Encoding.ASCII.GetString(_reader.ReadBytes(8)));
 
             //OEMRevision
-            Global.mDebugger.Send("\tOEMRevision: " + _reader.ReadUInt32().ToString());
+            Global.debugger.Send("\tOEMRevision: " + _reader.ReadUInt32().ToString());
 
             //OEMRevision
-            Global.mDebugger.Send("\tCreatorID: " + _reader.ReadUInt32().ToString());
+            Global.debugger.Send("\tCreatorID: " + _reader.ReadUInt32().ToString());
 
             //OEMRevision
-            Global.mDebugger.Send("\tCreatorRevision: " + _reader.ReadUInt32().ToString());
+            Global.debugger.Send("\tCreatorRevision: " + _reader.ReadUInt32().ToString());
         }
 
         private static void ParseDT(AcpiHeader* hdr)
@@ -620,7 +620,7 @@ namespace Cosmoss.Core
             }
             else if (signature == "APIC")
             {
-                Global.mDebugger.Send("Parse APIC");
+                Global.debugger.Send("Parse APIC");
 
                 MADT = (MADTPtr*)hdr;
 
@@ -634,27 +634,27 @@ namespace Cosmoss.Core
 
                     if (type == ApicType.LocalAPIC)
                     {
-                        Global.mDebugger.Send("Parse local APIC");
+                        Global.debugger.Send("Parse local APIC");
                         var pic = (ApicLocalApic*)p;
-                        Global.mDebugger.Send("Found APIC " + (ulong)pic->ApicId + " (Processor ID:" + pic->AcpiProcessorId + ")");
+                        Global.debugger.Send("Found APIC " + (ulong)pic->ApicId + " (Processor ID:" + pic->AcpiProcessorId + ")");
                     }
                     else if (type == ApicType.IOAPIC)
                     {
-                        Global.mDebugger.Send("Parse IO APIC");
+                        Global.debugger.Send("Parse IO APIC");
                         var ioapic = (ApicIOApic*)p;
                         if (IOAPIC == null)
                         {
                             IOAPIC = ioapic;
                         }
-                        Global.mDebugger.Send("Found IO APIC " + (ulong)ioapic->IOApicId + " (Address:0x" + ((ulong)ioapic->IOApicAddress).ToString("X") + ", GSIB:" + (ulong)ioapic->GlobalSystemInterruptBase + ")");
+                        Global.debugger.Send("Found IO APIC " + (ulong)ioapic->IOApicId + " (Address:0x" + ((ulong)ioapic->IOApicAddress).ToString("X") + ", GSIB:" + (ulong)ioapic->GlobalSystemInterruptBase + ")");
                     }
                     else if (type == ApicType.InterruptOverride)
                     {
-                        Global.mDebugger.Send("Parse Interrupt Override APIC");
+                        Global.debugger.Send("Parse Interrupt Override APIC");
 
                         var ovr = (ApicInterruptOverride*)p;
 
-                        Global.mDebugger.Send("Found APIC Interrupt Override (Bus: " + ((ulong)ovr->Bus).ToString() + ", Source:" + ((ulong)ovr->Source).ToString() + ", Interrupt:0x" + ((ulong)ovr->Interrupt).ToString("X") + ", Flags:" + ((ulong)ovr->Flags).ToString() + ")");
+                        Global.debugger.Send("Found APIC Interrupt Override (Bus: " + ((ulong)ovr->Bus).ToString() + ", Source:" + ((ulong)ovr->Source).ToString() + ", Interrupt:0x" + ((ulong)ovr->Interrupt).ToString("X") + ", Flags:" + ((ulong)ovr->Flags).ToString() + ")");
                     }
 
                     p += length;
@@ -664,7 +664,7 @@ namespace Cosmoss.Core
 
         public static void Log(string m, bool console = true)
         {
-           Global.mDebugger.Send(m);
+           Global.debugger.Send(m);
            // if (console)
                 Console.WriteLine(m);
         }
@@ -742,7 +742,7 @@ namespace Cosmoss.Core
 
                     if (ovr->Source == irq)
                     {
-                        Global.mDebugger.Send("IRQ" + irq + " remapped to IRQ" + ovr->Interrupt);
+                        Global.debugger.Send("IRQ" + irq + " remapped to IRQ" + ovr->Interrupt);
 
                         return ovr->Interrupt;
                     }
