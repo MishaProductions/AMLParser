@@ -6,7 +6,6 @@
         <Platform>cosmos</Platform>
         <SupportsX86Intrinsics>false</SupportsX86Intrinsics>
         <SelfContained>True</SelfContained>
-		
     </PropertyGroup>
 
     <PropertyGroup>
@@ -14,31 +13,17 @@
         <StartCosmosGDB>False</StartCosmosGDB>
         <VisualStudioDebugPort>Pipe: Cosmos\Serial</VisualStudioDebugPort>
         <CosmosDebugPort>Serial: COM1</CosmosDebugPort>
-        <Launch>Bochs</Launch>
+        <Launch>VMware</Launch>
         <Profile>VMware</Profile>
         <Description>Use VMware Player or Workstation to deploy and debug.</Description>
         <PxeInterface>192.168.0.8</PxeInterface>
-        <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-        <ExtractMapFile>True</ExtractMapFile>
-        <StackCorruptionDetectionEnabled>False</StackCorruptionDetectionEnabled>
-        <DebugEnabled>True</DebugEnabled>
-        <TraceMode>All</TraceMode>
-        <VMWareEdition>Player</VMWareEdition>
-        <CompileVBEMultiboot>False</CompileVBEMultiboot>
-        <VBEResolution></VBEResolution>
-        <OptimizationLevel>3</OptimizationLevel>
-        <RemoveBootDebugOutput>True</RemoveBootDebugOutput>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Cosmos.Build" Version="0-*" NoWarn="NU1604" />
         <PackageReference Include="Cosmos.Debug.Kernel" Version="0-*" NoWarn="NU1604" />
         <PackageReference Include="Cosmos.System2" Version="0-*" NoWarn="NU1604" />
-		<PackageReference Include="Cosmos.Plugs" Version="0-*" NoWarn="NU1604" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\ACPIAML\ACPIAML.csproj" />
+        <PackageReference Include="Cosmos.Plugs" Version="0-*" NoWarn="NU1604" />
     </ItemGroup>
 
 </Project>
