@@ -1,4 +1,7 @@
 ﻿using Cosmos.Core;
+using Cosmos.Core.Memory;
+using Cosmos.Core.Multiboot;
+using Cosmos.Core.Multiboot.Tags;
 using Cosmos.HAL;
 using System;
 using ACPI = Cosmoss.Core.ACPI;
@@ -20,7 +23,7 @@ namespace CosmosACPIAMl
             Console.Write("Text typed: ");
             Console.WriteLine(input);
         }
-        protected override void OnBoot()
+        protected unsafe override void OnBoot()
         {
             //Global.TextScreen = new TextScreen();
             //var x = new VBECanvas(new Mode(600, 800, ColorDepth.ColorDepth32));
@@ -38,13 +41,26 @@ namespace CosmosACPIAMl
             Console.WriteLine("Starting ACPI");
             //SerialPort.Enable(SerialPort.COM1);
             mDebugger.Send("ACPI Init");
+
+            uint MbAddress = Multiboot2.GetMBIAddress();
+
+            MB2Tag* Tag;
+
+            for (Tag = (MB2Tag*)(MbAddress + 8); Tag->Type != 0; Tag = (MB2Tag*)((byte*)Tag + (Tag->Size + 7 & ~7)))
+            {
+                Console.WriteLine("TAG: " + Tag->Type);
+            }
+
             foreach (var item in CPU.GetMemoryMap())
             {
-                var x = $"Address: {item.Address}, Length: {item.Length}, Type: {item.Type}";
+                var x = $"Address: 0x{item.Address.ToString("X")}, Length: 0x{item.Length.ToString("X")}, Type: {item.Type}";
                 mDebugger.Send(x);
                 Console.WriteLine(x);
                 //SerialPort.SendString(x + "\n");
             }
+            Console.WriteLine("RAT is at 0x" + ((ulong)RAT.RamStart).ToString("X")+", ends at 0x"+ ((ulong)RAT.HeapEnd).ToString("X"));
+
+            Console.WriteLine("mrat is at 0x" + ((ulong)RAT.mRAT).ToString("X"));
             try
             {
                 ACPI.Start();

@@ -301,7 +301,7 @@ namespace Cosmoss.Core
         }
         private static void lai_populate(lai_nsnode parent, lai_aml_segment amls, lai_state state)
         {
-            var size = amls.table->header.Length;
+            var size = amls.table->header.Length - 36;
             var dsdtBytes = ((byte*)amls.table) + 36;
             lai_ctxitem populate_ctxitem = lai_exec_push_ctxstack(ref state, amls, dsdtBytes, parent, null); ;
 
@@ -313,29 +313,27 @@ namespace Cosmoss.Core
             if (status != 0)
             {
                 lai_log("lai_exec_run() failed in lai_populate()");
-
             }
         }
         private static int lai_exec_run(lai_state state)
         {
             while (lai_exec_peek_stack_back(state) != null)
             {
-                //debug
-                int i = 0;
-                while (true)
-                {
-                    lai_stackitem trace_item = lai_exec_peek_stack(state, i);
-                    if (trace_item == null)
-                        break;
+                ////debug
+                //int i = 0;
+                //while (true)
+                //{
+                //    lai_stackitem trace_item = lai_exec_peek_stack(state, i);
+                //    if (trace_item == null)
+                //        break;
 
-                    if (trace_item.kind == LAI_OP_STACKITEM)
-                        lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
-                    else
-                        lai_log($"stack item {i} is of type {trace_item.kind}");
-                    i++;
-                }
+                //    if (trace_item.kind == LAI_OP_STACKITEM)
+                //        lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
+                //    else
+                //        lai_log($"stack item {i} is of type {trace_item.kind}");
+                //    i++;
+                //}
 
-                //todo
                 int e = lai_exec_process(state);
                 if (e != 0)
                     return e;
@@ -405,10 +403,8 @@ namespace Cosmoss.Core
 
             if (item.kind == LAI_POPULATE_STACKITEM)
             {
-                lai_log("Processing: LAI_POPULATE_STACKITEM. pc=" + block.pc + ",limit=" + block.limit);
                 if (block.pc == block.limit)
                 {
-                    lai_log("block.pc == block.limit");
                     lai_exec_pop_blkstack_back(ref state);
                     lai_exec_pop_ctxstack_back(ref state);
                     lai_exec_pop_stack_back(ref state);
@@ -868,14 +864,12 @@ namespace Cosmoss.Core
                 }
 
                 lai_exec_commit_pc(ref state, pc);
-                string path = lai_stringify_amlname(amln);
-                lai_log("parsing name " + path + " at " + pc);
+               // string path = lai_stringify_amlname(amln);
+               // lai_log("parsing name " + path + " at " + pc);
                 if (parse_mode == LAI_DATA_MODE)
                 {
-                    lai_log("aa");
                     if (want_result != 0)
                     {
-                        lai_log("a");
                         var opstack_res = lai_exec_push_opstack(ref state);
                         opstack_res.tag = LAI_OPERAND_OBJECT;
                         opstack_res.objectt.type = LAI_LAZY_HANDLE;
@@ -887,10 +881,8 @@ namespace Cosmoss.Core
                 }
                 else if ((ReadFlags(parse_mode) & LAI_MF_RESOLVE) == 0)
                 {
-                    lai_log("bb,parsemode=" + parse_mode);
                     if (want_result != 0)
                     {
-                        lai_log("b");
                         var opstack_res = lai_exec_push_opstack(ref state);
                         opstack_res.tag = LAI_UNRESOLVED_NAME;
                         opstack_res.unres_ctx_handle = ctx_handle;
@@ -903,14 +895,11 @@ namespace Cosmoss.Core
                 }
                 else
                 {
-                    lai_log("cc");
                     lai_nsnode handle = lai_do_resolve(ctx_handle, ref amln);
                     if (handle == null)
                     {
-                        lai_log("c");
                         if ((ReadFlags(parse_mode) & LAI_MF_NULLABLE) != 0)
                         {
-                            lai_log("parsing non-existant name: " + path);
                             if (want_result != 0)
                             {
                                 var opstack_res = lai_exec_push_opstack(ref state);
@@ -927,7 +916,6 @@ namespace Cosmoss.Core
                     }
                     else if (handle.type == LAI_NAMESPACE_METHOD && (ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0)
                     {
-                        lai_log("d");
                         lai_stackitem node_item = lai_exec_push_stack(ref state, LAI_INVOKE_STACKITEM);
                         node_item.opstack_frame = (state.opstack_base.Count);
                         node_item.ivk_argc = handle.method_flags & METHOD_ARGC_MASK;
@@ -941,7 +929,6 @@ namespace Cosmoss.Core
                     }
                     else if ((ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0)
                     {
-                        lai_log("e");
                         // TODO: Get rid of this case again!
                         lai_variable var = new();
                         lai_exec_access(ref var, handle);
@@ -955,8 +942,7 @@ namespace Cosmoss.Core
                     }
                     else
                     {
-                        lai_log("f");
-                        lai_log("parsing name " + path + " using the else statement");
+                       // lai_log("parsing name " + path + " using the else statement");
 
                         if (want_result != 0)
                         {
@@ -1365,7 +1351,6 @@ namespace Cosmoss.Core
                     }
                 case (EXTOP_PREFIX << 8) | DEVICE:
                     {
-                        lai_warn("TODO: DEVICE INSTRUCTION");
                         int nested_pc;
                         int encoded_size = 0;
                         lai_amlname amln = new lai_amlname();
@@ -1534,12 +1519,10 @@ namespace Cosmoss.Core
                 return true;
 
             var sz = (code[pc] >> 6) & 3;
-            lai_log("reading varint at pc : " + pc + ",sizer: " + sz);
             if (sz == 0)
             {
                 outvar = (int)(code[pc] & 0x3F);
                 pc++;
-                lai_log("resullt: " + outvar);
                 return false;
             }
             else if (sz == 1)
@@ -1548,7 +1531,6 @@ namespace Cosmoss.Core
                     return true;
                 outvar = (int)(code[pc] & 0x0F) | (int)(code[pc + 1] << 4);
                 pc += 2;
-                lai_log("resullt: " + outvar);
                 return false;
             }
             else if (sz == 2)
@@ -1557,7 +1539,6 @@ namespace Cosmoss.Core
                     return true;
                 outvar = ((code[pc] & 0x0F) | (code[pc + 1] << 4)) | (code[pc + 2] << 12);
                 pc += 3;
-                lai_log("resullt: " + outvar);
                 return false;
             }
             else
@@ -1571,7 +1552,6 @@ namespace Cosmoss.Core
                 outvar = (int)(code[pc] & 0x0F) | (int)(code[pc + 1] << 4)
                        | (int)(code[pc + 2] << 12) | (int)(code[pc + 3] << 20);
                 pc += 4;
-                lai_log("resullt: " + outvar);
                 return false;
             }
         }
@@ -1602,7 +1582,7 @@ namespace Cosmoss.Core
                         node = node.al_target;
                         LAI_ENSURE(node.type != LAI_NAMESPACE_ALIAS, "node->type != LAI_NAMESPACE_ALIAS");
                     }
-                    lai_log("resolution returns " + lai_stringify_amlname(amln));
+                   // lai_log("resolution returns " + lai_stringify_amlname(amln));
                     return node;
                 }
                 return null;
