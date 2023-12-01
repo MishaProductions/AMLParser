@@ -41,7 +41,151 @@ namespace CosmosLAI.LAI
                 node.parent.children.Add(h, node);
             }
         }
+        private static lai_nsnode lai_ns_get_child(lai_nsnode parent, string name)
+        {
+            uint h = lai_hash_string(name);
+            return (lai_nsnode)parent.children[h];
+        }
+        private static int lai_amlname_parse(ref lai_amlname amln, byte* ptr, int startIndex)
+        {
+            amln.is_absolute = false;
+            amln.height = 0;
+            byte* begin = ptr + startIndex;
+            byte* it = begin;
+            if (*it == '\\')
+            {
+                // First character is \ for absolute paths.
+                amln.is_absolute = true;
+                it++;
+            }
+            else
+            {
+                // Non-absolute paths can be prefixed by a number of ^.
+                while (*it == '^')
+                {
+                    amln.height++;
+                    it++;
+                }
+            }
+            // Finally, we parse the name's prefix (which determines the number of segments).
+            int num_segs;
+            if (*it == '\0')
+            {
+                it++;
+                num_segs = 0;
+            }
+            else if (*it == DUAL_PREFIX)
+            {
+                it++;
+                num_segs = 2;
+            }
+            else if (*it == MULTI_PREFIX)
+            {
+                it++;
+                num_segs = *it;
+                if (!(num_segs > 2))
+                {
+                    lai_panic("assertion failed: num_segs > 2");
+                }
+                it++;
+            }
+            else
+            {
+                if (!lai_is_name(*it)) { lai_panic("assertion failed: lai_is_name(*it)"); }
+                num_segs = 1;
+            }
+            amln.search_scopes = !amln.is_absolute && amln.height == 0 && num_segs == 1;
+            amln.it = it;
+            amln.end = it + 4 * num_segs;
+            return (int)(amln.end - begin);
 
+        }
+        private static bool lai_amlname_done(lai_amlname amln)
+        {
+            return amln.it == amln.end;
+        }
+        private static string lai_amlname_iterate(lai_amlname name)
+        {
+            string result = "";
+            for (int i = 0; i < 4; i++)
+                result += name.it[i];
+            name.it += 4;
+            return result;
+        }
+
+        private static lai_nsnode lai_do_resolve(lai_nsnode handle, lai_amlname amln)
+        {
+            lai_nsnode current = handle;
+            if (amln.search_scopes)
+            {
+                var segment = lai_amlname_iterate(amln);
+
+                while (current != null)
+                {
+                    lai_nsnode node = lai_ns_get_child(current, segment);
+                    if (node == null)
+                    {
+                        current = current.parent;
+                        continue;
+                    }
+
+                    if (node.type == lai_nsnode_type.Alias)
+                    {
+                        node = node.al_target;
+                    }
+
+                    return node;
+                }
+
+                return null;
+            }
+            else
+            {
+                if (amln.is_absolute)
+                {
+                    while (current.parent != null)
+                    {
+                        current = current.parent;
+                    }
+                }
+
+                for (int i = 0; i < amln.height; i++)
+                {
+                    if(current.parent == null)
+                    {
+                        if (current.type != lai_nsnode_type.Root)
+                        {
+                            lai_panic("case #234 current type is not root");
+                        }
+                        break;
+                    }
+
+                    current = current.parent;
+                }
+
+                if (lai_amlname_done(amln))
+                {
+                    return current;
+                }
+
+                while (!lai_amlname_done(amln))
+                {
+                    var segment = lai_amlname_iterate(amln);
+                    current = lai_ns_get_child(current, segment);
+                    if (current == null)
+                    {
+                        return null;
+                    }
+                }
+                
+                if (current.type == lai_nsnode_type.Alias)
+                {
+                    current = current.al_target;
+                }
+
+                return current;
+            }
+        }
         public static lai_nsnode lai_create_root()
         {
             global_instance.root_node = new();
@@ -102,7 +246,7 @@ namespace CosmosLAI.LAI
 
         public static void lai_panic(string message)
         {
-            Console.WriteLine("LAI PANIC: "+message);
+            Console.WriteLine("LAI PANIC: " + message);
             while (true) { }
         }
     }
@@ -118,6 +262,7 @@ namespace CosmosLAI.LAI
         public lai_nsnode_type type;
         public string name;
         public lai_nsnode parent;
+        public lai_nsnode al_target;
         public Hashtable children = new Hashtable();
     }
 
@@ -126,6 +271,7 @@ namespace CosmosLAI.LAI
         public List<lai_ctxitem> ctxstack = new();
         public List<lai_blkitem> blkstack = new();
         public List<lai_stackitem> stack = new();
+        public List<lai_operand> opstack = new();
     }
 
     public struct acpi_aml
