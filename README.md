@@ -1,3 +1,2 @@
-# CosmosLAI
-LAI ported to C#.
-Better ACPI driver for Cosmos. PR coming soon. (aka AMLParser)
+# CosmosACPIAMl
+ Better ACPI driver for Cosmos. PR coming soon. (aka AMLParser)
