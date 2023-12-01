@@ -56,8 +56,6 @@ namespace CosmosLAI.LAI
         private const int OPREGION = 0x80;
         private const int SCOPE_OP = 0x10;
 
-
-
         private static int ReadFlags(int parse_mode)
         {
             //cosmos-specific function
@@ -170,13 +168,6 @@ namespace CosmosLAI.LAI
             state.stack.RemoveAt(state.stack.Count - 1);
         }
 
-        private static lai_operand lai_exec_push_opstack(lai_state state)
-        {
-            var item = new lai_operand();
-            state.opstack.Add(item);
-            return item;
-        }
-
 
         // lai_exec_run(): This is the main AML interpreter function.
         public static int lai_exec_run(lai_state state)
@@ -244,7 +235,60 @@ namespace CosmosLAI.LAI
             pc += lai_amlname_parse(ref amln, method, pc);
             return false;
         }
-      
+        private static int lai_amlname_parse(ref lai_amlname amln, byte* ptr, int startIndex)
+        {
+            amln.is_absolute = false;
+            amln.height = 0;
+            byte* begin = ptr + startIndex;
+            byte* it = begin;
+            if (*it == '\\')
+            {
+                // First character is \ for absolute paths.
+                amln.is_absolute = true;
+                it++;
+            }
+            else
+            {
+                // Non-absolute paths can be prefixed by a number of ^.
+                while (*it == '^')
+                {
+                    amln.height++;
+                    it++;
+                }
+            }
+            // Finally, we parse the name's prefix (which determines the number of segments).
+            int num_segs;
+            if (*it == '\0')
+            {
+                it++;
+                num_segs = 0;
+            }
+            else if (*it == DUAL_PREFIX)
+            {
+                it++;
+                num_segs = 2;
+            }
+            else if (*it == MULTI_PREFIX)
+            {
+                it++;
+                num_segs = *it;
+                if (!(num_segs > 2))
+                {
+                    lai_panic("assertion failed: num_segs > 2");
+                }
+                it++;
+            }
+            else
+            {
+                if (!lai_is_name(*it)) { lai_panic("assertion failed: lai_is_name(*it)"); }
+                num_segs = 1;
+            }
+            amln.search_scopes = !amln.is_absolute && amln.height == 0 && num_segs == 1;
+            amln.it = it;
+            amln.end = it + 4 * num_segs;
+            return (int)(amln.end - begin);
+
+        }
 
         private static int lai_exec_process(lai_state state)
         {
@@ -293,12 +337,6 @@ namespace CosmosLAI.LAI
             int pc = block.pc;
             int limit = block.limit;
 
-            // Package-size encoding (and similar) needs to know the PC of the opcode.
-            // If an opcode sequence contains a pkgsize, the sequence generally ends at:
-            //     opcode_pc + pkgsize + opcode size.
-            int opcode_pc = pc;
-
-
             if (!(block.pc < block.limit))
             {
                 lai_panic($"execution escaped out of code range [{block.pc + 36}, limit {block.limit + 36}");
@@ -329,36 +367,7 @@ namespace CosmosLAI.LAI
                     Console.WriteLine("failed to parse name");
                     return -2;
                 }
-                lai_exec_commit_pc(state, pc);
-                if (parse_mode == LAI_DATA_MODE)
-                {
-                    if (want_result != 0)
-                    {
-                        var opstack_res = lai_exec_push_opstack(state);
-                        opstack_res.tag = lai_operand_type.LAI_OPERAND_OBJECT;
-                        opstack_res.objectt.type = lai_variable_type.LAI_LAZY_HANDLE;
-                        opstack_res.objectt.unres_ctx_handle = ctxitem.handle;
-                        opstack_res.objectt.unres_aml = method + opcode_pc;
-                    }
-                }
-                else if ((ReadFlags(parse_mode) & LAI_MF_RESOLVE)== 0)
-                {
-                    if (want_result != 0)
-                    {
-                        var opstack_res = lai_exec_push_opstack(state);
-                        opstack_res.tag = lai_operand_type.LAI_UNRESOLVED_NAME;
-                        opstack_res.unres_ctx_handle = ctxitem.handle;
-                        opstack_res.unres_aml = method + opcode_pc;
-                    }
-                }
-                else
-                {
-                    lai_nsnode handle = lai_do_resolve(ctxitem.handle, amln);
-                    if (handle == null)
-                    {
 
-                    }
-                }
                 lai_panic("todo string aml case");
             }
 
@@ -378,7 +387,7 @@ namespace CosmosLAI.LAI
                 opcode = method[pc];
                 pc++;
             }
-            Console.WriteLine("new OpCode 0x" + opcode.ToString("X") + ", at PC=" + pc);
+            Console.WriteLine("new OpCode " + opcode.ToString("X") + ", PC=" + pc);
 
             // This switch handles the majority of all opcodes.
             switch (opcode)
@@ -388,29 +397,6 @@ namespace CosmosLAI.LAI
                     break;
 
                 case ZERO_OP:
-                    lai_exec_commit_pc(state, pc);
-
-                    if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE)
-                    {
-                        var result = lai_exec_push_opstack(state);
-                        result.tag = lai_operand_type.LAI_OPERAND_OBJECT;
-                        result.objectt.type = lai_variable_type.LAI_INTEGER;
-                        result.objectt.integer = 0;
-                    }
-                    else if (parse_mode == LAI_REFERENCE_MODE || parse_mode == LAI_OPTIONAL_REFERENCE_MODE)
-                    {
-                        var result = lai_exec_push_opstack(state);
-                        result.tag = lai_operand_type.LAI_NULL_NAME;
-                    }
-                    else
-                    {
-                        if (parse_mode == LAI_EXEC_MODE)
-                            Console.WriteLine("Zero() in execution mode has no effect");
-                        else
-                        {
-                            lai_panic("ZERO_OP: unexpected parse mode");
-                        }
-                    }
                     break;
 
                 case NAME_OP:
@@ -432,7 +418,6 @@ namespace CosmosLAI.LAI
 
             return 0;
         }
-
         public static int lai_populate(lai_nsnode parent, uint* aml, lai_state state)
         {
             uint size = (*(aml + 1));
@@ -491,78 +476,12 @@ namespace CosmosLAI.LAI
         public byte node_arg_modes2;
         public byte node_arg_modes3;
     }
-    public unsafe class lai_amlname
+    public unsafe struct lai_amlname
     {
         public bool is_absolute;
         public int height;
         public bool search_scopes;
         public byte* it;
         public byte* end;
-    }
-
-    // ----------------------------------------------------------------------------
-    // struct lai_variable.
-    // ----------------------------------------------------------------------------
-
-    /* There are several things to note about handles, references and indices:
-     * - Handles and references are distinct types!
-     *   For example, handles to methods can be created in constant package data.
-     *   Those handles are distinct from references returned by RefOf(MTHD).
-     * - References bind to the variable (LOCALx, ARGx or the namespace node),
-     *   while indices bind to the object (e.g., the package inside a LOCALx).
-     *   This means that, if a package in a LOCALx variable is replaced by another package,
-     *   existing indices still refer to the old package, while existing references
-     *   will see the new package. */
-
-    // Value types: integer, string, buffer, package.
-    public enum lai_variable_type
-    {
-        LAI_INTEGER = 1,
-        LAI_STRING,
-        LAI_BUFFER,
-        LAI_PACKAGE,
-        LAI_HANDLE,
-        LAI_LAZY_HANDLE,
-        LAI_ARG_REF,
-        LAI_LOCAL_REF,
-        LAI_NODE_REF,
-        LAI_STRING_INDEX,
-        LAI_BUFFER_INDEX,
-        LAI_PACKAGE_INDEX,
-    }
-    public unsafe class lai_variable
-    {
-        public lai_variable_type type;
-        public ulong integer;
-
-        //TODO
-        public lai_nsnode unres_ctx_handle;
-        public byte* unres_aml;
-        // TODO
-    }
-
-    // ----------------------------------------------------------------------------
-    // struct lai_operand.
-    // ----------------------------------------------------------------------------
-
-    // Name types: unresolved names and names of certain objects.
-    public enum lai_operand_type
-    {
-        LAI_OPERAND_OBJECT = 1,
-        LAI_NULL_NAME,
-        LAI_UNRESOLVED_NAME,
-        LAI_RESOLVED_NAME,
-        LAI_ARG_NAME,
-        LAI_LOCAL_NAME,
-        LAI_DEBUG_NAME
-    }
-    public unsafe class lai_operand
-    {
-        public lai_operand_type tag;
-        public lai_variable objectt = new();
-        public int index;
-        public lai_nsnode unres_ctx_handle;
-        public byte* unres_aml;
-        public lai_nsnode handle;
     }
 }
