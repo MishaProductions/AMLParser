@@ -8,9 +8,9 @@ using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using static Cosmoss.Core.ACPI;
 
-namespace Cosmoss.Core
+namespace CosmosACPIAML.ACPI
 {
-    public unsafe partial class ACPI
+    public unsafe partial class LAI
     {
         private const int LAI_NAMESPACE_ROOT = 1;
         private const int LAI_NAMESPACE_NAME = 2;
@@ -27,8 +27,6 @@ namespace Cosmoss.Core
         private const int LAI_NAMESPACE_POWERRESOURCE = 13;
         private const int LAI_NAMESPACE_BANKFIELD = 14;
         private const int LAI_NAMESPACE_OPREGION = 15;
-
-        private const int EXTOP_PREFIX = 0x5B;
 
         private const int LAI_POPULATE_STACKITEM = 1;
         private const int LAI_METHOD_STACKITEM = 2;
@@ -82,15 +80,6 @@ namespace Cosmoss.Core
         private const int LAI_MF_INVOKE = 8;
 
         private static byte[] lai_mode_flags = new byte[] { };
-        private const int ZERO_OP = 0x00;
-        private const int ONE_OP = 0x01;
-        private const int ALIAS_OP = 0x06;
-        private const int NAME_OP = 0x08;
-
-        private const int DUAL_PREFIX = 0x2E;
-        private const int MULTI_PREFIX = 0x2F;
-        private const int PARENT_CHAR = 0x5E;
-        private const int ROOT_CHAR = 0x5C;
 
         private const int LAI_UNRESOLVED_NAME = 3;
         private const int LAI_OPERAND_OBJECT = 1;
@@ -112,29 +101,150 @@ namespace Cosmoss.Core
         private const int LAI_BUFFER_INDEX = 11;
         private const int LAI_PACKAGE_INDEX = 12;
 
+
+        private const int LAI_RESOLVED_NAME = 4;
+
+        #region opcodes
+        private const int ZERO_OP = 0x00;
+        private const int ONE_OP = 0x01;
+        private const int ALIAS_OP = 0x06;
+        private const int NAME_OP = 0x08;
         private const int BYTEPREFIX = 0x0A;
         private const int WORDPREFIX = 0x0B;
         private const int DWORDPREFIX = 0x0C;
         private const int STRINGPREFIX = 0x0D;
         private const int QWORDPREFIX = 0x0E;
-
-        private const int LAI_RESOLVED_NAME = 4;
-        private const int METHOD_ARGC_MASK = 0x07;
-
-        //OpCodes
-        private const int FIELD = 0x81;
-        private const int MUTEX = 0x01;
-        private const int DEVICE = 0x82;
-        private const int PROCESSOR = 0x83;
+        private const int SCOPE_OP = 0x10;
         private const int BUFFER_OP = 0x11;
         private const int PACKAGE_OP = 0x12;
+        private const int VARPACKAGE_OP = 0x13;
         private const int METHOD_OP = 0x14;
+        private const int EXTERNAL_OP = 0x15;
+        private const int DUAL_PREFIX = 0x2E;
+        private const int MULTI_PREFIX = 0x2F;
+        private const int EXTOP_PREFIX = 0x5B;
+        private const int ROOT_CHAR = 0x5C;
+        private const int PARENT_CHAR = 0x5E;
+        private const int LOCAL0_OP = 0x60;
+        private const int LOCAL1_OP = 0x61;
+        private const int LOCAL2_OP = 0x62;
+        private const int LOCAL3_OP = 0x63;
+        private const int LOCAL4_OP = 0x64;
+        private const int LOCAL5_OP = 0x65;
+        private const int LOCAL6_OP = 0x66;
+        private const int LOCAL7_OP = 0x67;
+        private const int ARG0_OP = 0x68;
+        private const int ARG1_OP = 0x69;
+        private const int ARG2_OP = 0x6A;
+        private const int ARG3_OP = 0x6B;
+        private const int ARG4_OP = 0x6C;
+        private const int ARG5_OP = 0x6D;
+        private const int ARG6_OP = 0x6E;
+        private const int STORE_OP = 0x70;
+        private const int REFOF_OP = 0x71;
+        private const int ADD_OP = 0x72;
+        private const int CONCAT_OP = 0x73;
+        private const int SUBTRACT_OP = 0x74;
+        private const int INCREMENT_OP = 0x75;
+        private const int DECREMENT_OP = 0x76;
+        private const int MULTIPLY_OP = 0x77;
+        private const int DIVIDE_OP = 0x78;
+        private const int SHL_OP = 0x79;
+        private const int SHR_OP = 0x7A;
+        private const int AND_OP = 0x7B;
+        private const int OR_OP = 0x7D;
+        private const int XOR_OP = 0x7F;
+        private const int NAND_OP = 0x7C;
+        private const int NOR_OP = 0x7E;
+        private const int NOT_OP = 0x80;
+        private const int FINDSETLEFTBIT_OP = 0x81;
+        private const int FINDSETRIGHTBIT_OP = 0x82;
+        private const int DEREF_OP = 0x83;
+        private const int CONCATRES_OP = 0x84;
+        private const int MOD_OP = 0x85;
+        private const int NOTIFY_OP = 0x86;
+        private const int SIZEOF_OP = 0x87;
+        private const int INDEX_OP = 0x88;
+        private const int MATCH_OP = 0x89;
+        private const int DWORDFIELD_OP = 0x8A;
+        private const int WORDFIELD_OP = 0x8B;
+        private const int BYTEFIELD_OP = 0x8C;
+        private const int BITFIELD_OP = 0x8D;
+        private const int OBJECTTYPE_OP = 0x8E;
+        private const int QWORDFIELD_OP = 0x8F;
+        private const int LAND_OP = 0x90;
+        private const int LOR_OP = 0x91;
+        private const int LNOT_OP = 0x92;
+        private const int LEQUAL_OP = 0x93;
+        private const int LGREATER_OP = 0x94;
+        private const int LLESS_OP = 0x95;
+        private const int TOBUFFER_OP = 0x96;
+        private const int TODECIMALSTRING_OP = 0x97;
+        private const int TOHEXSTRING_OP = 0x98;
+        private const int TOINTEGER_OP = 0x99;
+        private const int TOSTRING_OP = 0x9C;
+        private const int MID_OP = 0x9E;
+        private const int COPYOBJECT_OP = 0x9D;
+        private const int CONTINUE_OP = 0x9F;
+        private const int IF_OP = 0xA0;
+        private const int ELSE_OP = 0xA1;
+        private const int WHILE_OP = 0xA2;
         private const int NOP_OP = 0xA3;
+        private const int RETURN_OP = 0xA4;
+        private const int BREAK_OP = 0xA5;
+        private const int BREAKPOINT_OP = 0xCC;
+        private const int ONES_OP = 0xFF;
+
+        // Extended=opcodes
+        private const int MUTEX = 0x01;
+        private const int EVENT = 0x02;
+        private const int CONDREF_OP = 0x12;
+        private const int ARBFIELD_OP = 0x13;
+        private const int STALL_OP = 0x21;
+        private const int SLEEP_OP = 0x22;
+        private const int ACQUIRE_OP = 0x23;
+        private const int RELEASE_OP = 0x27;
+        private const int SIGNAL_OP = 0x24;
+        private const int WAIT_OP = 0x25;
+        private const int RESET_OP = 0x26;
+        private const int FROM_BCD_OP = 0x28;
+        private const int TO_BCD_OP = 0x29;
+        private const int REVISION_OP = 0x30;
+        private const int DEBUG_OP = 0x31;
+        private const int FATAL_OP = 0x32;
+        private const int TIMER_OP = 0x33;
         private const int OPREGION = 0x80;
-        private const int SCOPE_OP = 0x10;
+        private const int FIELD = 0x81;
+        private const int DEVICE = 0x82;
+        private const int PROCESSOR = 0x83;
+        private const int POWER_RES = 0x84;
+        private const int THERMALZONE = 0x85;
+        private const int INDEXFIELD = 0x86; // ACPI spec v5.0 section 19.5.60
+        private const int BANKFIELD = 0x87;
 
+        // Field=Access=Type
+        private const int FIELD_ANY_ACCESS = 0x00;
+        private const int FIELD_BYTE_ACCESS = 0x01;
+        private const int FIELD_WORD_ACCESS = 0x02;
+        private const int FIELD_DWORD_ACCESS = 0x03;
+        private const int FIELD_QWORD_ACCESS = 0x04;
+        private const int FIELD_LOCK = 0x10;
+        private const int FIELD_PRESERVE = 0x00;
+        private const int FIELD_WRITE_ONES = 0x01;
+        private const int FIELD_WRITE_ZEROES = 0x02;
 
-        private static lai_nsnode RootNode;
+        // Methods
+        private const int METHOD_ARGC_MASK = 0x07;
+        private const int METHOD_SERIALIZED = 0x08;
+
+        // Match Comparison Type
+        private const int MATCH_MTR = 0x0;
+        private const int MATCH_MEQ = 0x1;
+        private const int MATCH_MLE = 0x2;
+        private const int MATCH_MLT = 0x3;
+        private const int MATCH_MGE = 0x4;
+        private const int MATCH_MGT = 0x5;
+        #endregion
 
         List<lai_nsnode> ns_array = new List<lai_nsnode>();
         #region Parse Flags
@@ -193,47 +303,49 @@ namespace Cosmoss.Core
 
         private static void lai_create_root()
         {
-            RootNode = new lai_nsnode();
-            RootNode.type = LAI_NAMESPACE_ROOT;
-            RootNode.name = "\\___";
-            RootNode.parent = null;
+            var instance = lai_current_instance();
+
+            instance.RootNode = new lai_nsnode();
+            instance.RootNode.type = LAI_NAMESPACE_ROOT;
+            instance.RootNode.name = "\\___";
+            instance.RootNode.parent = null;
 
             // Create the predefined objects.
             var sb_node = new lai_nsnode();
             sb_node.type = LAI_NAMESPACE_DEVICE;
             sb_node.name = "_SB_";
-            sb_node.parent = RootNode;
+            sb_node.parent = instance.RootNode;
             lai_install_nsnode(sb_node);
 
             var si_node = new lai_nsnode();
             si_node.type = LAI_NAMESPACE_DEVICE;
             si_node.name = "_SI_";
-            si_node.parent = RootNode;
+            si_node.parent = instance.RootNode;
             lai_install_nsnode(si_node);
 
             var gpe_node = new lai_nsnode();
             gpe_node.type = LAI_NAMESPACE_DEVICE;
             gpe_node.name = "_GPE";
-            gpe_node.parent = RootNode;
+            gpe_node.parent = instance.RootNode;
             lai_install_nsnode(gpe_node);
 
             var pr_node = new lai_nsnode();
             pr_node.type = LAI_NAMESPACE_DEVICE;
             pr_node.name = "_PR_";
-            pr_node.parent = RootNode;
+            pr_node.parent = instance.RootNode;
             lai_install_nsnode(pr_node);
 
             var tz_node = new lai_nsnode();
             tz_node.type = LAI_NAMESPACE_DEVICE;
             tz_node.name = "_TZ_";
-            tz_node.parent = RootNode;
+            tz_node.parent = instance.RootNode;
             lai_install_nsnode(tz_node);
 
             // Create the OS-defined objects.
             var osi_node = new lai_nsnode();
             osi_node.type = LAI_NAMESPACE_METHOD;
             osi_node.name = "_OSI";
-            osi_node.parent = RootNode;
+            osi_node.parent = instance.RootNode;
             osi_node.method_flags = 0x1;
             osi_node.method_override = DoOSIMethod;
             lai_install_nsnode(osi_node);
@@ -241,7 +353,7 @@ namespace Cosmoss.Core
             var os_node = new lai_nsnode();
             os_node.type = LAI_NAMESPACE_METHOD;
             os_node.name = "_OS_";
-            os_node.parent = RootNode;
+            os_node.parent = instance.RootNode;
             os_node.method_flags = 0x0;
             os_node.method_override = DoOSMethod;
             lai_install_nsnode(os_node);
@@ -249,43 +361,75 @@ namespace Cosmoss.Core
             var rev_node = new lai_nsnode();
             rev_node.type = LAI_NAMESPACE_METHOD;
             rev_node.name = "_REV";
-            rev_node.parent = RootNode;
+            rev_node.parent = instance.RootNode;
             rev_node.method_flags = 0x0;
             rev_node.method_override = DoRevMethod;
             lai_install_nsnode(rev_node);
         }
-        private static void DoRevMethod()
+        private static int DoRevMethod(lai_variable args, ref lai_variable result)
         {
             lai_panic("No implemenation: DoRevMethod");
+            return -1;
         }
-        private static void DoOSMethod()
+        private static int DoOSMethod(lai_variable args, ref lai_variable result)
         {
             lai_panic("No implemenation: DoOSMethod");
+            return -1;
         }
-        private static void DoOSIMethod()
+        private static int DoOSIMethod(lai_variable args, ref lai_variable result)
         {
             lai_panic("No implemenation: DoOSIMethod");
+            return -1;
         }
         /// <summary>
         /// Creates the ACPI namespace. Requires the ability to scan for ACPI tables
         /// </summary>
-        private static void lai_create_namespace()
+        public static void lai_create_namespace()
         {
             lai_create_root();
+            var instance = lai_current_instance();
 
             // Create the namespace with all the objects.
             var state = new lai_state();
-            var dsdt = (uint*)FADT->Dsdt;
+            state.fadt = (FADTPtr*)Cosmoss.Core.ACPI.GetTable("FACP");
+
+            if (state.fadt == null)
+            {
+                lai_panic("unable to find ACPI FACP");
+            }
+
+            var dsdt = (uint*)state.fadt->Dsdt;
             if (dsdt == null)
             {
                 lai_panic("unable to find ACPI DSDT");
             }
 
-            var tb = lai_load_table(dsdt, 0);
-            lai_populate(RootNode, tb, state);
+            // Load the DSDT.
+            var dsdt_table = lai_load_table(dsdt, 0);
+            lai_populate(instance.RootNode, dsdt_table, state);
             lai_finalize_state(state);
 
-            //TODO: port load ssdt and psdt code
+            byte* ssdt = Cosmoss.Core.ACPI.GetTable("SSDT");
+            if (ssdt != null)
+            {
+                var ssdt_table = lai_load_table(ssdt, 0);
+                state = new();
+
+                lai_populate(instance.RootNode, ssdt_table, state);
+                lai_finalize_state(state);
+            }
+
+            // The PSDT is treated the same way as the SSDT.
+            // Scan for PSDTs too for compatibility with some ACPI 1.0 PCs.
+            byte* psdt = Cosmoss.Core.ACPI.GetTable("PSDT");
+            if (psdt != null)
+            {
+                var psdt_table = lai_load_table(psdt, 0);
+                state = new();
+
+                lai_populate(instance.RootNode, psdt_table, state);
+                lai_finalize_state(state);
+            }
 
             lai_log("lai_create_namespace finished");
         }
@@ -314,33 +458,23 @@ namespace Cosmoss.Core
             {
                 lai_log("lai_exec_run() failed in lai_populate()");
             }
-        }
-        private static int lai_exec_run(lai_state state)
-        {
-            while (lai_exec_peek_stack_back(state) != null)
+
+            if (state.ctxstack_base.Count > 0)
             {
-                ////debug
-                //int i = 0;
-                //while (true)
-                //{
-                //    lai_stackitem trace_item = lai_exec_peek_stack(state, i);
-                //    if (trace_item == null)
-                //        break;
-
-                //    if (trace_item.kind == LAI_OP_STACKITEM)
-                //        lai_log($"stack item {i} is of type {trace_item.kind}, opcode is {trace_item.op_opcode}");
-                //    else
-                //        lai_log($"stack item {i} is of type {trace_item.kind}");
-                //    i++;
-                //}
-
-                int e = lai_exec_process(state);
-                if (e != 0)
-                    return e;
+                lai_panic("ctxstack is not empty after lai_exec_run completeted");
             }
 
-            return 0;
+            if (state.stack_base.Count > 0)
+            {
+                lai_panic("stack_base is not empty after lai_exec_run completeted");
+            }
+
+            if (state.opstack_base.Count > 0)
+            {
+                lai_panic("opstack_base is not empty after lai_exec_run completeted");
+            }
         }
+      
         private static void lai_exec_pop_blkstack_back(ref lai_state state)
         {
             state.blkstack_base.RemoveAt(state.blkstack_base.Count - 1);
@@ -356,12 +490,7 @@ namespace Cosmoss.Core
         }
         private static void lai_exec_pop_opstack(ref lai_state state, int n)
         {
-            //todo
-            //lai_log("lai_exec_pop_opstack() enter");
-            //Console.WriteLine("popping opstack. n=" + n + ",sz: " + state.stack_base.Count);
-            lai_log("lai_exec_pop_opstack: n: " + n + ", itms: " + state.opstack_base.Count);
             state.opstack_base.RemoveRange(state.opstack_base.Count - n, n);
-            //lai_log("lai_exec_pop_opstack() end");
         }
         private static void lai_exec_pop_opstack_back(ref lai_state state)
         {
@@ -514,8 +643,6 @@ namespace Cosmoss.Core
                     state.stack_base[state.stack_base.Count - 1] = item;
                     lai_exec_pop_opstack_back(ref state);
                 }
-                lai_log("opstackptr: " + (state.opstack_base.Count) + ", opstack cnt: " + state.opstack_base.Count);
-                lai_log("opstack_frame: " + item.opstack_frame);
                 LAI_ENSURE((state.opstack_base.Count) == item.opstack_frame + 1, "state->opstack_ptr == item->opstack_frame + 1");
                 if (block.pc == block.limit)
                 {
@@ -536,7 +663,6 @@ namespace Cosmoss.Core
             else if (item.kind == LAI_NODE_STACKITEM)
             {
                 int k = (state.opstack_base.Count) - item.opstack_frame;
-                lai_log("k is " + k + ", opstackptr: " + (state.opstack_base.Count) + ",frame=" + item.opstack_frame + ",val=" + item.node_arg_modes[k]);
                 if (item.node_arg_modes[k] == 0)
                 {
                     lai_operand[] operands = lai_exec_get_opstack(state, item.opstack_frame);
@@ -548,14 +674,41 @@ namespace Cosmoss.Core
                 }
                 else
                 {
-                    lai_log("mode is " + item.node_arg_modes[k]);
                     return lai_exec_parse(item.node_arg_modes[k], ref state);
                 }
             }
             else if (item.kind == LAI_OP_STACKITEM)
             {
-                lai_panic("LAI_OP_STACKITEM: not implemented");
-                return 1;
+                int k = state.opstack_base.Count - item.opstack_frame;
+                if (item.op_arg_modes[k] == 0)
+                {
+                    lai_variable result = new lai_variable();
+                    var operands = lai_exec_get_opstack(state, item.opstack_frame);
+                    var error = lai_exec_reduce_op(item.op_opcode, state, operands, ref result);
+                    if (error != 0)
+                    {
+                        return error;
+                    }
+
+                    lai_exec_pop_opstack(ref state, k);
+                    if (item.op_want_result != 0)
+                    {
+                        var opstack_res = lai_exec_push_opstack(ref state);
+                        opstack_res.tag = LAI_OPERAND_OBJECT;
+                        opstack_res.objectt = result;
+                    }
+                    else
+                    {
+                        lai_var_finalize(result);
+                    }
+
+                    lai_exec_pop_stack_back(ref state);
+                    return 0;
+                }
+                else
+                {
+                    return lai_exec_parse(item.op_arg_modes[k], ref state);
+                }
             }
             else if (item.kind == LAI_INVOKE_STACKITEM)
             {
@@ -588,6 +741,11 @@ namespace Cosmoss.Core
                 return 1;
             }
         }
+        private static void lai_var_finalize(lai_variable result)
+        {
+            // TODO
+        }
+
         private static int lai_exec_pkg_size(lai_variable objectt)
         {
             if (objectt.pkg_items == null)
@@ -598,7 +756,6 @@ namespace Cosmoss.Core
         {
             objectt.type = LAI_PACKAGE;
             objectt.pkg_rc = 1;
-            lai_log("package has " + n + " elements");
             objectt.pkg_items = new lai_variable[n];
         }
         private static void lai_exec_reduce_node(int opcode, lai_state state, lai_operand[] operands, lai_nsnode ctx_handle)
@@ -727,7 +884,6 @@ namespace Cosmoss.Core
                 {
                     node.name = segment;
                     node.parent = parent;
-                    lai_log("Created NEW node: " + node.name);
                     break;
                 }
                 else
@@ -800,8 +956,8 @@ namespace Cosmoss.Core
 
             int pc = block.pc;
             int limit = block.limit;
-            lai_log("\n");
-            lai_log("PARSING NEW OPCODE");
+            //lai_log("\n");
+            //lai_log("PARSING NEW OPCODE");
 
             // Package-size encoding (and similar) needs to know the PC of the opcode.
             // If an opcode sequence contains a pkgsize, the sequence generally ends at:
@@ -864,8 +1020,8 @@ namespace Cosmoss.Core
                 }
 
                 lai_exec_commit_pc(ref state, pc);
-               // string path = lai_stringify_amlname(amln);
-               // lai_log("parsing name " + path + " at " + pc);
+                // string path = lai_stringify_amlname(amln);
+                // lai_log("parsing name " + path + " at " + pc);
                 if (parse_mode == LAI_DATA_MODE)
                 {
                     if (want_result != 0)
@@ -942,7 +1098,7 @@ namespace Cosmoss.Core
                     }
                     else
                     {
-                       // lai_log("parsing name " + path + " using the else statement");
+                        // lai_log("parsing name " + path + " using the else statement");
 
                         if (want_result != 0)
                         {
@@ -972,7 +1128,7 @@ namespace Cosmoss.Core
                 opcode = method[pc];
                 pc++;
             }
-            lai_log("parsing opcode " + opcode + "[ at 0x" + table_pc.ToString("X") + "]");
+            //lai_log("parsing opcode " + opcode + "[ at 0x" + table_pc.ToString("X") + "]");
 
             switch (opcode)
             {
@@ -1136,7 +1292,7 @@ namespace Cosmoss.Core
                             {
                                 str += method[data_pc + i];
                             }
-                            Kernel.PrintDebug("stringprefix OP: "+str);
+                            Kernel.PrintDebug("stringprefix OP: " + str);
                             opstack_res.objectt.stringval = str;
                         }
                         else
@@ -1221,7 +1377,6 @@ namespace Cosmoss.Core
 
                         lai_exec_push_blkstack(ref state, nested_pc, opcode_pc + 1 + encoded_size);
                         var sz = opcode_pc + 1 + encoded_size;
-                        lai_log("scope: pushing to stack bcz of populatestackitm.pc=" + nested_pc + ",siz" + sz + ",encsize: " + encoded_size + ",pc:" + opcode_pc);
                         lai_exec_push_stack(ref state, LAI_POPULATE_STACKITEM);
                         break;
                     }
@@ -1246,7 +1401,7 @@ namespace Cosmoss.Core
                         lai_do_resolve_new_node(ref node, ctx_handle, ref amln);
                         node.method_flags = flags;
                         node.amls = amls;
-                        node.offset = nested_pc;
+                        node.pointer = method + nested_pc;
                         node.size = pc - nested_pc;
                         lai_install_nsnode(node);
 
@@ -1374,14 +1529,12 @@ namespace Cosmoss.Core
 
                         int sz = opcode_pc + 2 + encoded_size;
                         lai_exec_push_blkstack(ref state, nested_pc, opcode_pc + 2 + encoded_size);
-                        lai_log("pushing to stack bcz of populatestackitm.pc=" + nested_pc + ",siz" + sz);
 
                         lai_exec_push_stack(ref state, LAI_POPULATE_STACKITEM);
                         break;
                     }
                 case (EXTOP_PREFIX << 8) | PROCESSOR:
                     {
-                        lai_warn("Found legacy processor instruction");
                         lai_amlname amln = new lai_amlname();
                         int pkgsize = 0;
                         byte cpu_id = 0;
@@ -1432,6 +1585,32 @@ namespace Cosmoss.Core
                         //todo invocation
                         break;
                     }
+                case ADD_OP:
+                case SUBTRACT_OP:
+                case MOD_OP:
+                case MULTIPLY_OP:
+                case AND_OP:
+                case OR_OP:
+                case XOR_OP:
+                case SHR_OP:
+                case SHL_OP:
+                case NAND_OP:
+                case NOR_OP:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+
+                        lai_stackitem op_item = lai_exec_push_stack(ref state);
+                        op_item.kind = LAI_OP_STACKITEM;
+                        op_item.op_opcode = opcode;
+                        op_item.opstack_frame = state.opstack_base.Count;
+                        op_item.op_arg_modes = new byte[4];
+                        op_item.op_arg_modes[0] = LAI_OBJECT_MODE;
+                        op_item.op_arg_modes[1] = LAI_OBJECT_MODE;
+                        op_item.op_arg_modes[2] = LAI_REFERENCE_MODE;
+                        op_item.op_arg_modes[3] = 0;
+                        op_item.op_want_result = (byte)want_result;
+                        break;
+                    }
                 default:
                     lai_panic("Unknown opcode: " + opcode);
                     break;
@@ -1453,8 +1632,7 @@ namespace Cosmoss.Core
                 case LAI_NAMESPACE_FIELD:
                 case LAI_NAMESPACE_INDEXFIELD:
                 case LAI_NAMESPACE_BANKFIELD:
-                    lai_panic("TODO: lai_read_opregion");
-                    //lai_read_opregion(var, src);
+                    lai_read_opregion(ref var, src);
                     break;
                 case LAI_NAMESPACE_BUFFER_FIELD:
                     //lai_read_buffer(var, src);
@@ -1471,7 +1649,7 @@ namespace Cosmoss.Core
                     var.handle = src;
                     break;
                 default:
-                    lai_panic("unexpected type %d of named object in lai_exec_access()"+ src.type);
+                    lai_panic("unexpected type %d of named object in lai_exec_access()" + src.type);
                     break;
             }
         }
@@ -1582,7 +1760,7 @@ namespace Cosmoss.Core
                         node = node.al_target;
                         LAI_ENSURE(node.type != LAI_NAMESPACE_ALIAS, "node->type != LAI_NAMESPACE_ALIAS");
                     }
-                   // lai_log("resolution returns " + lai_stringify_amlname(amln));
+                    // lai_log("resolution returns " + lai_stringify_amlname(amln));
                     return node;
                 }
                 return null;
@@ -1840,7 +2018,6 @@ namespace Cosmoss.Core
                         return;
                     }
                 }
-                lai_log("lai_install_nsnode: adding node with type " + node.type + " at " + lai_stringify_node_path(node));
                 node.parent.children.Add(node);
             }
             else
@@ -1907,12 +2084,12 @@ namespace Cosmoss.Core
             else
             {
                 Console.WriteLine("LAI: " + msg);
-               // Kernel.PrintDebug("LAI: " + msg);
+                // Kernel.PrintDebug("LAI: " + msg);
             }
             //SerialPort.SendString("LAI: " + msg);
         }
     }
-
+    public delegate int lai_method_override(lai_variable args, ref lai_variable result);
     public unsafe class lai_nsnode
     {
         public string name;
@@ -1922,9 +2099,9 @@ namespace Cosmoss.Core
         public lai_variable objectt;
         public List<lai_nsnode> children = new List<lai_nsnode>();
         public int method_flags;
-        public Action method_override;
+        public lai_method_override method_override;
         public lai_aml_segment amls;
-        public byte[] objectaml;
+        public byte* pointer;
         public lai_nsnode fld_region_node;
         public ulong fld_offset;
         public ulong fld_size;
@@ -2003,6 +2180,7 @@ namespace Cosmoss.Core
         public List<lai_blkitem> blkstack_base = new List<lai_blkitem>();
         public List<lai_stackitem> stack_base = new List<lai_stackitem>();
         public List<lai_operand> opstack_base = new List<lai_operand>();
+        internal unsafe FADTPtr* fadt;
         //TODO
     }
 
@@ -2029,7 +2207,7 @@ namespace Cosmoss.Core
         public int pkg_phase;
         public byte pkg_want_result;
         public int op_opcode;
-        public ulong op_arg_modes;
+        public byte[] op_arg_modes;
         public byte op_want_result;
         public int node_opcode;
         public byte[] node_arg_modes;

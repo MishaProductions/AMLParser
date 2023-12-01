@@ -1,6 +1,7 @@
 ﻿using Cosmos.Core;
 using Cosmos.Core.Multiboot;
 using Cosmos.Debug.Kernel;
+using CosmosACPIAML.ACPI;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -528,7 +529,7 @@ namespace Cosmoss.Core
             var p = (uint*)(rsdt + 1);
             var end = (uint*)((byte*)rsdt + rsdt->Length);
             Console.WriteLine("RSDT ptr: " + (uint)rsdt);
-            Console.WriteLine("p=" + (int)p + ",end=" + (int)end+",len="+ rsdt->Length);
+            Console.WriteLine("p=" + (int)p + ",end=" + (int)end + ",len=" + rsdt->Length);
             while (p < end)
             {
                 var address = *p++;
@@ -538,41 +539,39 @@ namespace Cosmoss.Core
 
             return true;
         }
+        /// <summary>
+        /// Get a pointer to an ACPI table
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public static byte* GetTable(string name)
+        {
+            var rsdp = RSDPAddress();
+            if (rsdp == null)
+            {
+                return null;
+            }
+            var ptr = (byte*)rsdp;
+
+            var rsdt = (AcpiHeader*)rsdp->RsdtAddress;
+            ptr = (byte*)rsdt;
+
+            var p = (uint*)(rsdt + 1);
+            var end = (uint*)((byte*)rsdt + rsdt->Length);
+            while (p < end)
+            {
+                AcpiHeader* address = (AcpiHeader*)*p++;
+
+                var signature = Encoding.ASCII.GetString(address->Signature, 4);
+                if (signature == name)
+                {
+                    return (byte*)address;
+                }
+            }
+            return null;
+        }
 
         private static uint SdtLength = 0;
-
-        private static void ReadHeader(BinaryReader _reader)
-        {
-            Global.debugger.Send("SDT header:");
-
-            //Signature
-            Global.debugger.Send("\tSignature: " + Encoding.ASCII.GetString(_reader.ReadBytes(4)));
-
-            //Length
-            SdtLength = _reader.ReadUInt32();
-            Global.debugger.Send("\tLendth: " + SdtLength.ToString());
-
-            //Revision
-            Global.debugger.Send("\tRevision: " + _reader.ReadByte().ToString());
-
-            //Checksum
-            Global.debugger.Send("\tChecksum: " + _reader.ReadByte().ToString());
-
-            //OEM ID
-            Global.debugger.Send("\tOEM ID: " + Encoding.ASCII.GetString(_reader.ReadBytes(6)));
-
-            //OEMTableID
-            Global.debugger.Send("\tOEMTableID: " + Encoding.ASCII.GetString(_reader.ReadBytes(8)));
-
-            //OEMRevision
-            Global.debugger.Send("\tOEMRevision: " + _reader.ReadUInt32().ToString());
-
-            //OEMRevision
-            Global.debugger.Send("\tCreatorID: " + _reader.ReadUInt32().ToString());
-
-            //OEMRevision
-            Global.debugger.Send("\tCreatorRevision: " + _reader.ReadUInt32().ToString());
-        }
 
         private static void ParseDT(AcpiHeader* hdr)
         {
@@ -595,29 +594,8 @@ namespace Cosmoss.Core
                 SLP_EN = 1 << 13;
 
                 Console.WriteLine("DSDT addr: " + FADT->Dsdt);
-                //if (acpiCheckHeader((byte*)FADT->Dsdt, "DSDT") == 0)
-                //{
-                    Log("Found valid DSDT");
-                    //uint dsdtAddress = FADT->Dsdt;
-                    //uint dsdtLength = (uint)(*((int*)FADT->Dsdt + 1) - sizeof(AcpiHeader));
-
-                    //var dsdtHeader = new MemoryBlock08(dsdtAddress, 36);
-                    //var _reader = new BinaryReader(new MemoryStream(dsdtHeader.ToArray()));
-
-                    //ReadHeader(_reader);
-
-                    //var dsdtBlock = new MemoryBlock08(dsdtAddress + (uint)sizeof(AcpiHeader), SdtLength - (uint)sizeof(AcpiHeader));
-                
-                    //Stream stream = new MemoryStream(dsdtBlock.ToArray());
-
-                    Log("Create parser...");
-                    lai_create_namespace();
-                //}
-                //else
-                //{
-                //    Log("Invaild DSDT pointer");
-                //}
-
+                Log("Create parser...");
+                LAI.lai_create_namespace();
             }
             else if (signature == "APIC")
             {
@@ -665,9 +643,9 @@ namespace Cosmoss.Core
 
         public static void Log(string m, bool console = true)
         {
-           Global.debugger.Send(m);
-           // if (console)
-                Console.WriteLine(m);
+            Global.debugger.Send(m);
+            // if (console)
+            Console.WriteLine(m);
         }
 
         /// <summary>
@@ -675,7 +653,7 @@ namespace Cosmoss.Core
         /// </summary>
         public static void Enable()
         {
-            IOPort.Write8((ushort)SMI_CMD, ACPI_ENABLE);
+            LAI.lai_enable_acpi(1);
         }
 
         /// <summary>

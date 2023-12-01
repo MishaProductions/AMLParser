@@ -14,14 +14,14 @@
         <StartCosmosGDB>False</StartCosmosGDB>
         <VisualStudioDebugPort>Pipe: Cosmos\Serial</VisualStudioDebugPort>
         <CosmosDebugPort>Serial: COM1</CosmosDebugPort>
-        <Launch>Bochs</Launch>
+        <Launch>VMware</Launch>
         <Profile>VMware</Profile>
         <Description>Use VMware Player or Workstation to deploy and debug.</Description>
         <PxeInterface>192.168.0.8</PxeInterface>
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <ExtractMapFile>True</ExtractMapFile>
         <StackCorruptionDetectionEnabled>False</StackCorruptionDetectionEnabled>
-        <DebugEnabled>True</DebugEnabled>
+        <DebugEnabled>False</DebugEnabled>
         <TraceMode>All</TraceMode>
         <VMWareEdition>Player</VMWareEdition>
         <CompileVBEMultiboot>False</CompileVBEMultiboot>
