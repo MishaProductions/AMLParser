@@ -4,6 +4,7 @@ using CosmosACPIAMl;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using static Cosmoss.Core.ACPI;
 
@@ -300,28 +301,12 @@ namespace Cosmoss.Core
         }
         private static void lai_populate(lai_nsnode parent, lai_aml_segment amls, lai_state state)
         {
-            var size = amls.table->header.Length - sizeof(AcpiHeader);
-
-            //<cosmos>
-            uint dsdtAddress = FADT->Dsdt;
-            uint dsdtLength = (uint)(*((int*)FADT->Dsdt + 1) - sizeof(AcpiHeader));
-
-            var dsdtHeader = new MemoryBlock08(dsdtAddress, 36);
-            var _reader = new BinaryReader(new MemoryStream(dsdtHeader.ToArray()));
-
-            ReadHeader(_reader);
-
-            var dsdtBlock = new MemoryBlock08(dsdtAddress + 36, SdtLength);
-            lai_log("The DSDT is located at " + FADT->Dsdt + ",and length is " + dsdtLength);
-            var dsdtBytes = dsdtBlock.ToArray();
-            lai_log("The amount of bytes read is " + dsdtBytes.Length);
-            //</cosmos>
-     
-
+            var size = amls.table->header.Length;
+            var dsdtBytes = ((byte*)amls.table) + 36;
             lai_ctxitem populate_ctxitem = lai_exec_push_ctxstack(ref state, amls, dsdtBytes, parent, null); ;
 
             var blkitem = lai_exec_push_blkstack(ref state, 0, (int)size);
-            Kernel.PrintDebug(Convert.ToBase64String(dsdtBytes));
+            //Kernel.PrintDebug(Convert.ToBase64String(dsdtBytes));
             lai_exec_push_stack(ref state, LAI_POPULATE_STACKITEM);
 
             int status = lai_exec_run(state);
@@ -390,7 +375,7 @@ namespace Cosmoss.Core
             lai_ctxitem ctxitem = lai_exec_peek_ctxstack_back(state);
             lai_blkitem block = lai_exec_peek_blkstack_back(state);
             lai_aml_segment amls = ctxitem.amls;
-            byte[] method = ctxitem.code;
+            byte* method = ctxitem.code;
 
             lai_nsnode ctx_handle = ctxitem.handle;
             lai_invocation invocation = ctxitem.invocation;
@@ -812,7 +797,7 @@ namespace Cosmoss.Core
             lai_ctxitem ctxitem = lai_exec_peek_ctxstack_back(state);
             lai_blkitem block = lai_exec_peek_blkstack_back(state);
             lai_aml_segment amls = ctxitem.amls;
-            byte[] method = ctxitem.code;
+            byte* method = ctxitem.code;
 
             lai_nsnode ctx_handle = ctxitem.handle;
             lai_invocation invocation = ctxitem.invocation;
@@ -958,17 +943,15 @@ namespace Cosmoss.Core
                     {
                         lai_log("e");
                         // TODO: Get rid of this case again!
-                        lai_log("parsing name " + path);
-                        lai_panic("Case not converted to C#: (ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0");
-                        //lai_variable result = new lai_variable();
-                        //lai_exec_access(ref result, handle);
+                        lai_variable var = new();
+                        lai_exec_access(ref var, handle);
+                        if (want_result != 0)
+                        {
+                            var res = lai_exec_push_opstack(ref state);
+                            res.tag = LAI_OPERAND_OBJECT;
+                            res.objectt = var;
+                        }
 
-                        //if (want_result != 0)
-                        //{
-                        //    var opstack_res = lai_exec_push_opstack(ref state);
-                        //    opstack_res.tag = LAI_OPERAND_OBJECT;
-                        //    //lai_var_move(&opstack_res->object, &result);
-                        //}
                     }
                     else
                     {
@@ -1136,6 +1119,49 @@ namespace Cosmoss.Core
                         state.stack_base[state.stack_base.Count - 1] = node_item;
                         break;
                     }
+                case STRINGPREFIX:
+                    {
+                        int data_pc;
+                        int n = 0; // Length of null-terminated string.
+                        while (pc + n < block.limit && method[pc + n] != 0)
+                        {
+                            n++;
+                        }
+
+                        if (pc + n == block.limit)
+                        {
+                            lai_panic("unterminated string in AML code");
+                        }
+
+                        data_pc = pc;
+                        pc += n + 1;
+
+                        lai_exec_commit_pc(ref state, pc);
+
+                        if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE)
+                        {
+                            var opstack_res = lai_exec_push_opstack(ref state);
+                            opstack_res.tag = LAI_OPERAND_OBJECT;
+
+                            opstack_res.objectt.type = LAI_STRING;
+
+                            string str = "";
+                            for (int i = 0; i < n; i++)
+                            {
+                                str += method[data_pc + i];
+                            }
+                            Kernel.PrintDebug("stringprefix OP: "+str);
+                            opstack_res.objectt.stringval = str;
+                        }
+                        else
+                        {
+                            if (parse_mode != LAI_EXEC_MODE)
+                            {
+                                lai_panic("parse_mode must be exec mode in stringprefix instruction");
+                            }
+                        }
+                        break;
+                    }
                 case BUFFER_OP:
                     {
                         int data_pc = 0;
@@ -1149,6 +1175,8 @@ namespace Cosmoss.Core
                         lai_exec_push_blkstack(ref state, data_pc, opcode_pc + 1 + encoded_size);
 
                         var buf_item = lai_exec_push_stack(ref state, LAI_BUFFER_STACKITEM);
+                        buf_item.opstack_frame = state.opstack_base.Count;
+                        buf_item.buf_want_result = (byte)want_result;
                         break;
                     }
                 case PACKAGE_OP:
@@ -1427,7 +1455,43 @@ namespace Cosmoss.Core
             }
             return 0;
         }
-        private static bool lai_parse_u8(ref byte output, byte[] code, ref int pc, int limit)
+
+        // lai_exec_access() loads an object from a namespace node.
+        private static void lai_exec_access(ref lai_variable var, lai_nsnode src)
+        {
+            switch (src.type)
+            {
+                case LAI_NAMESPACE_NAME:
+                    // lai_var_assign(var, src.objectt);
+                    var = src.objectt;
+                    break;
+                case LAI_NAMESPACE_FIELD:
+                case LAI_NAMESPACE_INDEXFIELD:
+                case LAI_NAMESPACE_BANKFIELD:
+                    lai_panic("TODO: lai_read_opregion");
+                    //lai_read_opregion(var, src);
+                    break;
+                case LAI_NAMESPACE_BUFFER_FIELD:
+                    //lai_read_buffer(var, src);
+                    lai_panic("TODO: lai_read_buffer");
+                    break;
+                case LAI_NAMESPACE_EVENT: /* fall through */
+                case LAI_NAMESPACE_MUTEX: /* fall through */
+                case LAI_NAMESPACE_OPREGION: /* fall through */
+                case LAI_NAMESPACE_THERMALZONE: /* fall through */
+                case LAI_NAMESPACE_PROCESSOR: /* fall through */
+                case LAI_NAMESPACE_POWERRESOURCE: /* fall through */
+                case LAI_NAMESPACE_DEVICE:
+                    var.type = LAI_HANDLE;
+                    var.handle = src;
+                    break;
+                default:
+                    lai_panic("unexpected type %d of named object in lai_exec_access()"+ src.type);
+                    break;
+            }
+        }
+
+        private static bool lai_parse_u8(ref byte output, byte* code, ref int pc, int limit)
         {
             if (pc + 1 > limit)
                 return true;
@@ -1436,7 +1500,7 @@ namespace Cosmoss.Core
             pc++;
             return false;
         }
-        private static bool lai_parse_u16(ref ushort outt, byte[] method, ref int pc, int limit)
+        private static bool lai_parse_u16(ref ushort outt, byte* method, ref int pc, int limit)
         {
             if (pc + 2 > limit)
                 return true;
@@ -1444,7 +1508,7 @@ namespace Cosmoss.Core
             pc += 2;
             return false;
         }
-        private static bool lai_parse_u32(ref uint output, byte[] code, ref int pc, int limit)
+        private static bool lai_parse_u32(ref uint output, byte* code, ref int pc, int limit)
         {
             if (pc + 4 > limit)
                 return true;
@@ -1453,7 +1517,7 @@ namespace Cosmoss.Core
             pc += 4;
             return false;
         }
-        private static bool lai_parse_u64(ref ulong output, byte[] code, ref int pc, int limit)
+        private static bool lai_parse_u64(ref ulong output, byte* code, ref int pc, int limit)
         {
             if (pc + 8 > limit)
                 return true;
@@ -1464,7 +1528,7 @@ namespace Cosmoss.Core
             pc += 8;
             return false;
         }
-        private static bool lai_parse_varint(ref int outvar, byte[] code, ref int pc, int limit)
+        private static bool lai_parse_varint(ref int outvar, byte* code, ref int pc, int limit)
         {
             if (pc + 1 > limit)
                 return true;
@@ -1597,7 +1661,7 @@ namespace Cosmoss.Core
         private static string lai_stringify_amlname(lai_amlname in_amln)
         {
             // Make a copy to avoid rendering the original object unusable.
-            var amln = in_amln;
+            var amln = in_amln.Clone();
 
             var num_segs = (amln.end - amln.it) / 4;
             var max_length = 1 // Leading \ for absolute paths.
@@ -1643,70 +1707,68 @@ namespace Cosmoss.Core
 
             return ret;
         }
-        private static bool lai_parse_name(ref lai_amlname amln, byte[] method, ref int pc, int limit)
+        private static bool lai_parse_name(ref lai_amlname amln, byte* method, ref int pc, int limit)
         {
             pc += lai_amlname_parse(ref amln, method, pc);
             return false;
         }
-        private static int lai_amlname_parse(ref lai_amlname amln, byte[] data, int startIndex)
+        private static int lai_amlname_parse(ref lai_amlname amln, byte* data, int startIndex)
         {
             amln.is_absolute = false;
             amln.height = 0;
 
-            fixed (byte* ptr = data)
+
+            byte* begin = data + startIndex;
+            byte* it = begin;
+
+            if (*it == '\\')
             {
-                byte* begin = ptr + startIndex;
-                byte* it = begin;
-
-                if (*it == '\\')
-                {
-                    // First character is \ for absolute paths.
-                    amln.is_absolute = true;
-                    it++;
-                }
-                else
-                {
-                    // Non-absolute paths can be prefixed by a number of ^.
-                    while (*it == '^')
-                    {
-                        amln.height++;
-                        it++;
-                    }
-                }
-
-                // Finally, we parse the name's prefix (which determines the number of segments).
-                int num_segs;
-                if (*it == '\0')
-                {
-                    it++;
-                    num_segs = 0;
-                }
-                else if (*it == DUAL_PREFIX)
-                {
-                    it++;
-                    num_segs = 2;
-                }
-                else if (*it == MULTI_PREFIX)
-                {
-                    it++;
-                    num_segs = *it;
-                    if (!(num_segs > 2))
-                    {
-                        lai_panic("assertion failed: num_segs > 2");
-                    }
-                    it++;
-                }
-                else
-                {
-                    if (!lai_is_name(*it)) { lai_panic("assertion failed: lai_is_name(*it)"); }
-                    num_segs = 1;
-                }
-
-                amln.search_scopes = !amln.is_absolute && amln.height == 0 && num_segs == 1;
-                amln.it = it;
-                amln.end = it + 4 * num_segs;
-                return (int)(amln.end - begin);
+                // First character is \ for absolute paths.
+                amln.is_absolute = true;
+                it++;
             }
+            else
+            {
+                // Non-absolute paths can be prefixed by a number of ^.
+                while (*it == '^')
+                {
+                    amln.height++;
+                    it++;
+                }
+            }
+
+            // Finally, we parse the name's prefix (which determines the number of segments).
+            int num_segs;
+            if (*it == '\0')
+            {
+                it++;
+                num_segs = 0;
+            }
+            else if (*it == DUAL_PREFIX)
+            {
+                it++;
+                num_segs = 2;
+            }
+            else if (*it == MULTI_PREFIX)
+            {
+                it++;
+                num_segs = *it;
+                if (!(num_segs > 2))
+                {
+                    lai_panic("assertion failed: num_segs > 2");
+                }
+                it++;
+            }
+            else
+            {
+                if (!lai_is_name(*it)) { lai_panic("assertion failed: lai_is_name(*it)"); }
+                num_segs = 1;
+            }
+
+            amln.search_scopes = !amln.is_absolute && amln.height == 0 && num_segs == 1;
+            amln.it = it;
+            amln.end = it + 4 * num_segs;
+            return (int)(amln.end - begin);
         }
         private static void lai_exec_commit_pc(ref lai_state state, int pc)
         {
@@ -1765,7 +1827,7 @@ namespace Cosmoss.Core
 
             return state.blkstack_base[state.blkstack_base.Count - 1];
         }
-        private static lai_ctxitem lai_exec_push_ctxstack(ref lai_state state, lai_aml_segment seg, byte[] code, lai_nsnode handle, lai_invocation inno)
+        private static lai_ctxitem lai_exec_push_ctxstack(ref lai_state state, lai_aml_segment seg, byte* code, lai_nsnode handle, lai_invocation inno)
         {
             var x = new lai_ctxitem() { amls = seg, code = code, handle = handle, invocation = inno };
             state.ctxstack_base.Add(x);
@@ -1860,12 +1922,12 @@ namespace Cosmoss.Core
             if (msg == "\n")
             {
                 Console.WriteLine(msg);
-                Kernel.PrintDebug(msg);
+                //Kernel.PrintDebug(msg);
             }
             else
             {
                 Console.WriteLine("LAI: " + msg);
-                Kernel.PrintDebug("LAI: " + msg);
+               // Kernel.PrintDebug("LAI: " + msg);
             }
             //SerialPort.SendString("LAI: " + msg);
         }
@@ -1904,13 +1966,13 @@ namespace Cosmoss.Core
     {
         public AcpiHeader header;
     }
-    public unsafe struct lai_aml_segment
+    public unsafe class lai_aml_segment
     {
         public acpi_aml_t* table;
         // Index of the table (e.g., for SSDTs).
         public int index;
     }
-    public class lai_variable
+    public unsafe class lai_variable
     {
         public int type;
         /// <summary>
@@ -1928,8 +1990,10 @@ namespace Cosmoss.Core
         public lai_variable[] pkg_items;
         internal int pkg_rc;
         internal int unres_aml_pc;
-        internal byte[] unres_aml_method;
+        internal byte* unres_aml_method;
         internal lai_nsnode unres_ctx_handle;
+
+        public string stringval;
     }
     public class lai_invocation
     {
@@ -1938,10 +2002,10 @@ namespace Cosmoss.Core
 
         //todo: per_method_list
     }
-    public class lai_ctxitem
+    public unsafe class lai_ctxitem
     {
         public lai_aml_segment amls;
-        public byte[] code;
+        public byte* code;
         public lai_nsnode handle;
         public lai_invocation invocation;
     }
@@ -1997,7 +2061,7 @@ namespace Cosmoss.Core
         /// </summary>
         public int vaild;
     }
-    public unsafe struct lai_amlname
+    public unsafe class lai_amlname
     {
         public bool is_absolute;
         public int height;
@@ -2005,9 +2069,14 @@ namespace Cosmoss.Core
 
         public byte* it;
         public byte* end;
+
+        internal lai_amlname Clone()
+        {
+            return new lai_amlname() { end = end, it = it, search_scopes = search_scopes, height = height, is_absolute = is_absolute };
+        }
     }
 
-    public unsafe struct lai_operand
+    public unsafe class lai_operand
     {
         public int tag;
         public lai_variable objectt;
@@ -2017,7 +2086,7 @@ namespace Cosmoss.Core
         /// offset
         /// </summary>
         public int unres_aml;
-        public byte[] cosmos_aml;
+        public byte* cosmos_aml;
         public lai_nsnode handle;
     }
 }
