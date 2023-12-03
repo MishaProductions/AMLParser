@@ -474,7 +474,7 @@ namespace CosmosACPIAML.ACPI
                 lai_panic("opstack_base is not empty after lai_exec_run completeted");
             }
         }
-      
+
         private static void lai_exec_pop_blkstack_back(ref lai_state state)
         {
             state.blkstack_base.RemoveAt(state.blkstack_base.Count - 1);
@@ -546,8 +546,33 @@ namespace CosmosACPIAML.ACPI
             }
             else if (item.kind == LAI_METHOD_STACKITEM)
             {
-                lai_panic("LAI_METHOD_STACKITEM: TODO");
-                return 1;
+                if (block.pc == block.limit)
+                {
+                    if (state.opstack_base.Count != 0)
+                    {
+                        lai_panic("opstack is not empty before return");
+                    }
+
+                    if(item.mth_want_result != 0)
+                    {
+                        lai_operand result = lai_exec_push_opstack(ref state);
+                        result.tag = LAI_OPERAND_OBJECT;
+                        result.objectt.type = LAI_INTEGER;
+                        result.objectt.integer = 0;
+                    }
+
+                    // Clean up all per-method namespace nodes.
+                    // TODO
+
+                    lai_exec_pop_blkstack_back(ref state);
+                    lai_exec_pop_ctxstack_back(ref state);
+                    lai_exec_pop_stack_back(ref state);
+                    return 0;
+                }
+                else
+                {
+                    return lai_exec_parse(LAI_EXEC_MODE, ref state);
+                }
             }
             else if (item.kind == LAI_BUFFER_STACKITEM)
             {
@@ -717,8 +742,73 @@ namespace CosmosACPIAML.ACPI
             }
             else if (item.kind == LAI_RETURN_STACKITEM)
             {
-                lai_panic("LAI_RETURN_STACKITEM: not implemtented");
-                return 1;
+                int k = state.opstack_base.Count - item.opstack_frame;
+                LAI_ENSURE(k <= 1,"k <= 1");
+
+                if (k == 1)
+                {
+                    lai_variable result = new();
+                    lai_operand[] operand = lai_exec_get_opstack(state, item.opstack_frame);
+                    lai_exec_get_objectref(state, operand, ref result);
+                    lai_exec_pop_opstack_back(ref state);
+
+                    // Find the last LAI_METHOD_STACKITEM on the stack.
+                    int m = 0;
+                    lai_stackitem method_item;
+
+                    while (true)
+                    {
+                        method_item = lai_exec_peek_stack(state, 1 + m);
+
+                        if (method_item == null)
+                        {
+                            lai_panic("Return() outside of control method()");
+                        }
+
+                        if (method_item.kind == LAI_METHOD_STACKITEM)
+                            break;
+                        if(method_item.kind == LAI_COND_STACKITEM && method_item.kind != LAI_LOOP_STACKITEM)
+                        {
+                            lai_panic("Return() cannot skip item of type " + method_item.kind);
+                        }
+
+                        m++;
+                    }
+
+                    // Push the return value.
+                    if (method_item.mth_want_result != 0)
+                    {
+                        lai_operand opstack_res = lai_exec_push_opstack(ref state);
+                        opstack_res.tag = LAI_OPERAND_OBJECT;
+                        opstack_res.objectt = result; //TODO: clone it
+                    }
+
+                    // Clean up all per-method namespace nodes.
+                    // TODO
+
+                    // Pop the LAI_RETURN_STACKITEM.
+                    lai_exec_pop_stack_back(ref state);
+
+                    // Pop all nested loops/conditions.
+                    for (int i = 0; i < m; i++)
+                    {
+                        lai_stackitem pop_item = lai_exec_peek_stack_back(state);
+                        LAI_ENSURE(pop_item.kind == LAI_COND_STACKITEM
+                                   || pop_item.kind == LAI_LOOP_STACKITEM, "ensure case 23");
+                        lai_exec_pop_blkstack_back(ref state);
+                        lai_exec_pop_stack_back(ref state);
+                    }
+
+                    // Pop the LAI_METHOD_STACKITEM.
+                    lai_exec_pop_ctxstack_back(ref state);
+                    lai_exec_pop_blkstack_back(ref state);
+                    lai_exec_pop_stack_back(ref state);
+                    return 0;
+                }
+                else
+                {
+                    return lai_exec_parse(LAI_OBJECT_MODE, ref state);
+                }
             }
             else if (item.kind == LAI_LOOP_STACKITEM)
             {
@@ -741,6 +831,18 @@ namespace CosmosACPIAML.ACPI
                 return 1;
             }
         }
+
+        private static void lai_exec_get_objectref(lai_state state, lai_operand[] src, ref lai_variable objectt)
+        {
+            LAI_ENSURE(src[0].tag == LAI_OPERAND_OBJECT, "src[0].tag == LAI_OPERAND_OBJECT");
+            lai_var_assign(ref objectt, src[0].objectt);
+        }
+
+        private static void lai_var_assign(ref lai_variable dest, lai_variable src)
+        {
+            dest = src;
+        }
+
         private static void lai_var_finalize(lai_variable result)
         {
             // TODO
@@ -1611,8 +1713,17 @@ namespace CosmosACPIAML.ACPI
                         op_item.op_want_result = (byte)want_result;
                         break;
                     }
+                case RETURN_OP:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+
+                        lai_stackitem node_item = lai_exec_push_stack(ref state);
+                        node_item.kind = LAI_RETURN_STACKITEM;
+                        node_item.opstack_frame = state.opstack_base.Count;
+                        break;
+                    }
                 default:
-                    lai_panic("Unknown opcode: " + opcode);
+                    lai_panic("Unknown opcode: 0x" + opcode.ToString("X"));
                     break;
 
 

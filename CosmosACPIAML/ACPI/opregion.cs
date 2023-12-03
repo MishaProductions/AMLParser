@@ -31,7 +31,14 @@ namespace CosmosACPIAML.ACPI
 
         private static void lai_read_field(ref lai_variable destination, lai_nsnode field)
         {
+            ulong bytes = (field.fld_size + 7) / 8;
+            if (bytes > 8)
+            {
+                lai_create_buffer(destination, (int)bytes);
+                //lai_read_field_internal(destination.buffer, field);
+            }
             lai_log("lai_read_field: TODO");
+
         }
     }
 }

@@ -14,7 +14,7 @@
         <StartCosmosGDB>False</StartCosmosGDB>
         <VisualStudioDebugPort>Pipe: Cosmos\Serial</VisualStudioDebugPort>
         <CosmosDebugPort>Serial: COM1</CosmosDebugPort>
-        <Launch>VMware</Launch>
+        <Launch>Bochs</Launch>
         <Profile>VMware</Profile>
         <Description>Use VMware Player or Workstation to deploy and debug.</Description>
         <PxeInterface>192.168.0.8</PxeInterface>
@@ -24,10 +24,12 @@
         <DebugEnabled>False</DebugEnabled>
         <TraceMode>All</TraceMode>
         <VMWareEdition>Player</VMWareEdition>
-        <CompileVBEMultiboot>False</CompileVBEMultiboot>
-        <VBEResolution></VBEResolution>
+        <CompileVBEMultiboot>True</CompileVBEMultiboot>
+        <VBEResolution>800x600x32</VBEResolution>
         <OptimizationLevel>3</OptimizationLevel>
         <RemoveBootDebugOutput>True</RemoveBootDebugOutput>
+		<TargetArchitecture>amd64</TargetArchitecture>
+		<AllowComments>True</AllowComments>
     </PropertyGroup>
 
     <ItemGroup>

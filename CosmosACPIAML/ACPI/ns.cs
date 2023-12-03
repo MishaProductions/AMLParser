@@ -23,90 +23,86 @@ namespace CosmosACPIAML.ACPI
             {
                 current = lai_current_instance().RootNode;
             }
-
-            fixed (char* pathtmp = path)
+            int offset = 0;
+            if (path[0] == '\\')
             {
-                char* pathptr = pathtmp;
-                if (*pathptr == '\\')
+                while (current.parent != null)
                 {
-                    while (current.parent != null)
-                    {
-                        current = current.parent;
-                    }
-                    if (current.type != LAI_NAMESPACE_ROOT)
-                    {
-                        lai_panic("expected namespace root in lai_resolve path");
-                    }
-                    pathptr++;
+                    current = current.parent;
                 }
-                else
+                if (current.type != LAI_NAMESPACE_ROOT)
                 {
-                    int height = 0;
-                    while(*pathptr == '^')
-                    {
-                        height++;
-                        pathptr++;
-                    }
+                    lai_panic("expected namespace root in lai_resolve path");
+                }
+                offset++;
+            }
+            else
+            {
+                int height = 0;
+                while (path[offset] == '^')
+                {
+                    height++;
+                    offset++;
+                }
 
-                    for (int i = 0; i < height; i++)
+                for (int i = 0; i < height; i++)
+                {
+                    if (current.parent == null)
                     {
-                        if (current.parent == null)
+                        if (current.type != LAI_NAMESPACE_ROOT)
                         {
-                            if (current.type != LAI_NAMESPACE_ROOT)
-                            {
-                                lai_panic("expected namespace root in lai_resolve path");
-                            }
+                            lai_panic("expected namespace root in lai_resolve path");
                         }
-                        current = current.parent;
                     }
+                    current = current.parent;
                 }
+            }
 
-                if (*pathptr == 0)
+            if (offset >= path.Length)
+            {
+                return current;
+            }
+
+            for (; ; )
+            {
+                string segment = "";
+                int k;
+                for (k = 0; k < 4; k++)
                 {
-                    return current;
-                }
-
-                for(; ; )
-                {
-                    string segment = "";
-                    int k;
-                    for (k = 0; k < 4; k++)
-                    {
-                        if (!lai_is_name((byte)*pathptr))
-                            break;
-                        segment += *(pathptr++);
-                    }
-
-                    // ACPI pads names with trailing underscores.
-                    while (k < 4)
-                    {
-                        segment += "_";
-                        k++;
-                    }
-
-                    current = lai_ns_get_child(current, segment);
-                    if (current == null)
-                    {
-                        return null;
-                    }
-
-                    if (current.type == LAI_NAMESPACE_ALIAS)
-                    {
-                        current = current.al_target;
-                    }
-
-                    if (*pathptr == 0)
-                    {
+                    if (!lai_is_name((byte)path[offset]))
                         break;
-                    }
-
-                    if (*pathptr != '.')
-                    {
-                        lai_panic("expected pathptr to have .");
-                    }
-
-                    pathptr++;
+                    segment += path[offset++];
                 }
+
+                // ACPI pads names with trailing underscores.
+                while (k < 4)
+                {
+                    segment += "_";
+                    k++;
+                }
+
+                current = lai_ns_get_child(current, segment);
+                if (current == null)
+                {
+                    return null;
+                }
+
+                if (current.type == LAI_NAMESPACE_ALIAS)
+                {
+                    current = current.al_target;
+                }
+
+                if (offset >= path.Length)
+                {
+                    break;
+                }
+
+                if (path[offset] != '.')
+                {
+                    lai_panic("expected pathptr to have . but got " + path[offset] + ". Requested path was " + path + " segment is " + segment + ", k is " + k);
+                }
+
+                offset++;
             }
 
             return current;
