@@ -108,6 +108,12 @@ namespace CosmosACPIAML.ACPI
             return current;
         }
 
+        public static lai_nsnode lai_ns_child_iterate(lai_ns_child_iterator iter)
+        {
+            // TODO
+
+            return null; // Equivalent to returning NULL in C
+        }
     }
 
     public class lai_instance

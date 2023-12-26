@@ -2285,6 +2285,7 @@ namespace CosmosACPIAML.ACPI
         public int pc;
         public int limit;
     }
+
     public class lai_state
     {
         public List<lai_ctxitem> ctxstack_base = new List<lai_ctxitem>();
@@ -2292,6 +2293,17 @@ namespace CosmosACPIAML.ACPI
         public List<lai_stackitem> stack_base = new List<lai_stackitem>();
         public List<lai_operand> opstack_base = new List<lai_operand>();
         internal unsafe FADTPtr* fadt;
+
+        public int ctxstack_capacity;
+        public int blkstack_capacity;
+        public int stack_capacity;
+        public int opstack_capacity;
+
+        public int ctxstack_ptr; // Stack to track the current context.
+        public int blkstack_ptr; // Stack to track the current block.
+        public int stack_ptr; // Stack to track the current execution state.
+        public int opstack_ptr;
+
         //TODO
     }
 
