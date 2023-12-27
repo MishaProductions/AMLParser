@@ -108,11 +108,83 @@ namespace CosmosACPIAML.ACPI
             return current;
         }
 
+        public static int lai_check_device_pnp_id(lai_nsnode dev, lai_variable pnp_id, lai_state state)
+        {
+            lai_variable id = new lai_variable();
+            int ret = 1;
+
+            lai_nsnode hid_handle = lai_resolve_path(dev, "_HID");
+            
+            if (hid_handle != null)
+            {
+                Cosmos.HAL.Global.debugger.Send("_HID found!");
+
+                if (lai_eval(id, hid_handle, state) != 0)
+                {
+                    LAI.lai_warn("could not evaluate _HID of device");
+                }
+                else
+                {
+                    Cosmos.HAL.Global.debugger.Send("id.type == 0");
+                    LAI.LAI_ENSURE(id.type == 0, "id.type == 0");
+                }
+            }
+
+            if (id.type == 0)
+            {
+                Cosmos.HAL.Global.debugger.Send("id.type == 0");
+
+                lai_nsnode cid_handle = lai_resolve_path(dev, "_CID");
+                if (cid_handle != null)
+                {
+                    if (lai_eval(id, cid_handle, state) != 0)
+                    {
+                        LAI.lai_warn("could not evaluate _CID of device");
+                        return 1;
+                    }
+                    else
+                    {
+                        Cosmos.HAL.Global.debugger.Send("id.type == 0");
+                        LAI.LAI_ENSURE(id.type == 0, "id.type == 0");
+                    }
+                }
+            }
+
+            Cosmos.HAL.Global.debugger.Send("id.type=" + id.type + " pnp_id.type=" + pnp_id.type);
+
+            if (id.type == LAI_INTEGER && pnp_id.type == LAI_INTEGER)
+            {
+                Cosmos.HAL.Global.debugger.Send("id.type == LAI_INTEGER && pnp_id.type == LAI_INTEGER");
+
+                if (id.integer == pnp_id.integer)
+                {
+                    ret = 0; // IDs match
+                }
+            }
+            else if (id.type == LAI_STRING && pnp_id.type == LAI_STRING)
+            {
+                Cosmos.HAL.Global.debugger.Send("id.type == LAI_STRING && pnp_id.type == LAI_STRING");
+
+                if (id.stringval == pnp_id.stringval)
+                {
+                    ret = 0; // String IDs match
+                }
+            }
+
+            lai_var_finalize(id);
+            return ret;
+        }
+
         public static lai_nsnode lai_ns_child_iterate(lai_ns_child_iterator iter)
         {
-            // TODO
+            while (iter.i < iter.parent.children.Count)
+            {
+                lai_nsnode n = iter.parent.children[(int)(iter.i++)];
+                if (n != null)
+                    return n;
+            }
 
-            return null; // Equivalent to returning NULL in C
+            return null;
         }
     }
 

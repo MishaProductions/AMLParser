@@ -15,7 +15,6 @@ namespace CosmosACPIAML.ACPI
             state.blkstack_capacity = 8;
             state.stack_capacity = 16;
             state.opstack_capacity = 16;
-            state.ctxstack_ptr = -1;
             state.blkstack_ptr = -1;
             state.stack_ptr = -1;
         }
@@ -72,8 +71,7 @@ namespace CosmosACPIAML.ACPI
                     }
                     if (result != null)
                     {
-                        // TODO
-                        lai_panic("TODO: lai_eval args case 1");
+                        lai_obj_clone(ref result, handle.objectt);
                     }
                     return 0;
                 case LAI_NAMESPACE_METHOD:

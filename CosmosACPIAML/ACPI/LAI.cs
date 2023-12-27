@@ -2299,7 +2299,6 @@ namespace CosmosACPIAML.ACPI
         public int stack_capacity;
         public int opstack_capacity;
 
-        public int ctxstack_ptr; // Stack to track the current context.
         public int blkstack_ptr; // Stack to track the current block.
         public int stack_ptr; // Stack to track the current execution state.
         public int opstack_ptr;

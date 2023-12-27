@@ -60,7 +60,7 @@ namespace CosmosACPIAML.ACPI
 
         public static int lai_pci_route(ref acpi_resource dest, byte seg, byte bus, byte slot, byte function)
         {
-            Console.WriteLine("Searching route for " + seg + ":" + bus + ":" + ":" + slot + ":" + function);
+            Global.debugger.Send("Searching route for " + seg + ":" + bus + ":" + ":" + slot + ":" + function);
 
             PCIDevice device = PCI.GetDevice(bus, slot, function);
             if (device != null && device.DeviceExists)
@@ -70,7 +70,7 @@ namespace CosmosACPIAML.ACPI
                 if (pin == 0 || pin > 4)
                     return 1;
 
-                Console.WriteLine("Pin is " +  pin);
+                Global.debugger.Send("Pin is " +  pin);
 
                 if (lai_pci_route_pin(ref dest, seg, bus, slot, function, pin) != lai_api_error.LAI_ERROR_NONE)
                     return 1;
@@ -90,18 +90,22 @@ namespace CosmosACPIAML.ACPI
             // Adjusting pin number for ACPI
             pin--;
 
-            Console.WriteLine("Finding bus...");
+            Global.debugger.Send("Finding bus...");
 
             // Find the PCI bus in the namespace
             lai_nsnode handle = lai_pci_find_bus(seg, bus, ref state);
             if (handle == null)
                 return lai_api_error.LAI_ERROR_NO_SUCH_NODE;
 
+            Global.debugger.Send("handle=" + handle.name);
+
+            Global.debugger.Send("Finding _PRT...");
+
             // Read the PCI routing table
             lai_nsnode prt_handle = lai_resolve_path(handle, "_PRT");
             if (prt_handle == null)
             {
-                Console.WriteLine("host bridge has no _PRT");
+                Global.debugger.Send("host bridge has no _PRT");
                 return lai_api_error.LAI_ERROR_NO_SUCH_NODE;
             }
 
@@ -117,15 +121,63 @@ namespace CosmosACPIAML.ACPI
             lai_eisaid(ref pci_pnp_id, ACPI_PCI_ROOT_BUS_PNP_ID);
             lai_eisaid(ref pcie_pnp_id, ACPI_PCIE_ROOT_BUS_PNP_ID);
 
+            Global.debugger.Send("Finding _SB_...");
+
             lai_nsnode sb_handle = lai_resolve_path(null, "\\_SB_");
             if (sb_handle == null) return null; // Ensuring sb_handle is not null
 
-            var iter = new lai_ns_child_iterator(); // Initialize the iterator
-            lai_nsnode node;
+            Global.debugger.Send("_SB_ found!");
 
+            var iter = new lai_ns_child_iterator();
+            iter.parent = sb_handle;
+            iter.i = 0;
+
+            Global.debugger.Send("Iterating...");
+
+            lai_nsnode node;
             while ((node = lai_ns_child_iterate(iter)) != null)
             {
-                
+                Global.debugger.Send("Iterating inside...");
+
+                if (lai_check_device_pnp_id(node, pci_pnp_id, state) != 0
+                && lai_check_device_pnp_id(node, pcie_pnp_id, state) != 0)
+                {
+                    Global.debugger.Send("Process each node for matching PCI or PCIe IDs...");
+                    continue;
+                }
+
+                lai_variable bus_number = new lai_variable();
+                ulong bbn_result = 0;
+                lai_nsnode bbn_handle = lai_resolve_path(node, "_BBN");
+                if (bbn_handle != null)
+                {
+                    Global.debugger.Send("Process _BBN method");
+                    if (lai_eval(bus_number, bbn_handle, state) != 0)
+                    {
+                        lai_warn("failed to evaluate _BBN");
+                        continue;
+                    }
+                    lai_obj_get_integer(bus_number, ref bbn_result);
+                }
+
+                lai_variable seg_number = new lai_variable();
+                ulong seg_result = 0;
+                lai_nsnode seg_handle = lai_resolve_path(node, "_SEG");
+                if (seg_handle != null)
+                {
+                    Global.debugger.Send("Process _SEG method");
+                    if (lai_eval(seg_number, seg_handle, state) != 0)
+                    {
+                        lai_warn("failed to evaluate _SEG");
+                        continue;
+                    }
+                    lai_obj_get_integer(seg_number, ref seg_result);
+                }
+
+                if (seg_result == seg && bbn_result == bus)
+                {
+                    return node;
+                }
             }
 
             return null;

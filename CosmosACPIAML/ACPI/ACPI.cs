@@ -458,6 +458,12 @@ namespace Cosmoss.Core
             {
                 Enable();
             }
+
+            foreach (var device in Cosmos.HAL.PCI.Devices)
+            {
+                LAI.acpi_resource resource = new LAI.acpi_resource();
+                LAI.lai_pci_route(ref resource, 0, (byte)device.bus, (byte)device.slot, (byte)device.function);
+            }
         }
 
         /// <summary>
@@ -653,7 +659,7 @@ namespace Cosmoss.Core
         /// </summary>
         public static void Enable()
         {
-            LAI.lai_enable_acpi(1);
+            // LAI.lai_enable_acpi(1);
         }
 
         /// <summary>
