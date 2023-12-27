@@ -50,6 +50,7 @@ namespace CosmosACPIAML.ACPI
             if (handle != null)
             {
                 lai_state state = new lai_state();
+                Cosmos.HAL.Global.debugger.Send("debug m");
                 lai_variable result = new lai_variable();
 
                 var err = lai_eval(result, handle, state);

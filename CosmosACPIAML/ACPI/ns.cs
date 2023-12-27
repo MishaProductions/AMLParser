@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -60,6 +61,7 @@ namespace CosmosACPIAML.ACPI
 
             if (offset >= path.Length)
             {
+                Cosmos.HAL.Global.debugger.Send("offset >= path.Length");
                 return current;
             }
 
@@ -110,11 +112,13 @@ namespace CosmosACPIAML.ACPI
 
         public static int lai_check_device_pnp_id(lai_nsnode dev, lai_variable pnp_id, lai_state state)
         {
+            Cosmos.HAL.Global.debugger.Send("lai_check_device_pnp_id for dev=" + dev.name + " pnp_id=" + pnp_id.stringval);
+
+            Cosmos.HAL.Global.debugger.Send("debug i");
             lai_variable id = new lai_variable();
             int ret = 1;
 
             lai_nsnode hid_handle = lai_resolve_path(dev, "_HID");
-            
             if (hid_handle != null)
             {
                 Cosmos.HAL.Global.debugger.Send("_HID found!");
@@ -125,8 +129,7 @@ namespace CosmosACPIAML.ACPI
                 }
                 else
                 {
-                    Cosmos.HAL.Global.debugger.Send("id.type == 0");
-                    LAI.LAI_ENSURE(id.type == 0, "id.type == 0");
+                    LAI.LAI_ENSURE(id.type != 0, "id.type != 0");
                 }
             }
 
@@ -144,9 +147,12 @@ namespace CosmosACPIAML.ACPI
                     }
                     else
                     {
-                        Cosmos.HAL.Global.debugger.Send("id.type == 0");
-                        LAI.LAI_ENSURE(id.type == 0, "id.type == 0");
+                        LAI.LAI_ENSURE(id.type != 0, "id.type != 0");
                     }
+                }
+                else
+                {
+                    Cosmos.HAL.Global.debugger.Send("_CID nt found!");
                 }
             }
 
@@ -158,6 +164,8 @@ namespace CosmosACPIAML.ACPI
 
                 if (id.integer == pnp_id.integer)
                 {
+                    Cosmos.HAL.Global.debugger.Send("MATCH!");
+
                     ret = 0; // IDs match
                 }
             }
@@ -167,6 +175,8 @@ namespace CosmosACPIAML.ACPI
 
                 if (id.stringval == pnp_id.stringval)
                 {
+                    Cosmos.HAL.Global.debugger.Send("MATCH!");
+
                     ret = 0; // String IDs match
                 }
             }

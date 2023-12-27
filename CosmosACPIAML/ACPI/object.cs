@@ -30,8 +30,8 @@ namespace CosmosACPIAML.ACPI
         public static void lai_obj_clone(ref lai_variable dest, lai_variable source)
         {
             // Clone into a temporary object.
+            Cosmos.HAL.Global.debugger.Send("debug j");
             lai_variable temp = new lai_variable();
-            temp.integer = 0;
 
             switch (source.type)
             {
@@ -50,7 +50,12 @@ namespace CosmosACPIAML.ACPI
                     lai_clone_package(ref temp, source);
                     Cosmos.HAL.Global.debugger.Send("lai_clone_package end");
                     break;
+                default:
+                    Cosmos.HAL.Global.debugger.Send("source.type=" + source.type);
+                    break;
             }
+
+            Cosmos.HAL.Global.debugger.Send("temp.type=" + temp.type);
 
             if (temp.type == 0)
             {

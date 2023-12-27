@@ -130,6 +130,7 @@ namespace CosmosACPIAML.ACPI
                     continue;
                 }
 
+                Cosmos.HAL.Global.debugger.Send("debug j");
                 lai_variable bus_number = new lai_variable();
                 ulong bbn_result = 0;
                 lai_nsnode bbn_handle = lai_resolve_path(node, "_BBN");
@@ -143,7 +144,7 @@ namespace CosmosACPIAML.ACPI
                     }
                     lai_obj_get_integer(bus_number, ref bbn_result);
                 }
-
+                Cosmos.HAL.Global.debugger.Send("debug l");
                 lai_variable seg_number = new lai_variable();
                 ulong seg_result = 0;
                 lai_nsnode seg_handle = lai_resolve_path(node, "_SEG");
