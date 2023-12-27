@@ -47,17 +47,6 @@ namespace CosmosACPIAML.ACPI
             byte irq_flags; // valid for IRQs
         };
 
-        public struct lai_ns_iterator
-        {
-            public long i;
-        }
-
-        public struct lai_ns_child_iterator
-        {
-            public long i;
-            public lai_nsnode parent;
-        }
-
         public static int lai_pci_route(ref acpi_resource dest, byte seg, byte bus, byte slot, byte function)
         {
             Global.debugger.Send("Searching route for " + seg + ":" + bus + ":" + ":" + slot + ":" + function);
@@ -128,14 +117,9 @@ namespace CosmosACPIAML.ACPI
 
             Global.debugger.Send("_SB_ found!");
 
-            var iter = new lai_ns_child_iterator();
-            iter.parent = sb_handle;
-            iter.i = 0;
-
             Global.debugger.Send("Iterating...");
 
-            lai_nsnode node;
-            while ((node = lai_ns_child_iterate(iter)) != null)
+            foreach (var node in sb_handle.children)
             {
                 Global.debugger.Send("Iterating inside...");
 

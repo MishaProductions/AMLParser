@@ -174,18 +174,6 @@ namespace CosmosACPIAML.ACPI
             lai_var_finalize(id);
             return ret;
         }
-
-        public static lai_nsnode lai_ns_child_iterate(lai_ns_child_iterator iter)
-        {
-            while (iter.i < iter.parent.children.Count)
-            {
-                lai_nsnode n = iter.parent.children[(int)(iter.i++)];
-                if (n != null)
-                    return n;
-            }
-
-            return null;
-        }
     }
 
     public class lai_instance
