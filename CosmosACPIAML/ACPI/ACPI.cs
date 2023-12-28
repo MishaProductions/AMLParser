@@ -513,18 +513,11 @@ namespace Cosmoss.Core
         private static bool Init()
         {
             IOAPIC = null;
-            var rsdp = RSDPAddress();
-            if (rsdp == null)
+            AcpiHeader* rsdt = null;
+            if (Multiboot2.AcpiOld != null)
             {
-                Console.WriteLine("Failed to find pointer to acpi RSDP");
-                return false;
+                rsdt = (AcpiHeader*)Multiboot2.AcpiOld->RsdtAddress;
             }
-            var ptr = (byte*)rsdp;
-
-            Console.WriteLine("ACPI v" + rsdp->Revision);
-            Console.WriteLine("RSDP ptr: " + (uint)rsdp);
-            var rsdt = (AcpiHeader*)rsdp->RsdtAddress;
-            ptr = (byte*)rsdt;
 
             var p = (uint*)(rsdt + 1);
             var end = (uint*)((byte*)rsdt + rsdt->Length);

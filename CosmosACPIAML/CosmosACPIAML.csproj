@@ -24,11 +24,10 @@
         <DebugEnabled>False</DebugEnabled>
         <TraceMode>All</TraceMode>
         <VMWareEdition>Player</VMWareEdition>
-        <CompileVBEMultiboot>True</CompileVBEMultiboot>
+        <CompileVBEMultiboot>False</CompileVBEMultiboot>
         <VBEResolution>800x600x32</VBEResolution>
         <OptimizationLevel>3</OptimizationLevel>
         <RemoveBootDebugOutput>True</RemoveBootDebugOutput>
-		<TargetArchitecture>amd64</TargetArchitecture>
 		<AllowComments>True</AllowComments>
     </PropertyGroup>
 

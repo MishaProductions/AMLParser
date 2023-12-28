@@ -11,9 +11,53 @@ namespace CosmosACPIAML.ACPI
         private static int lai_exec_reduce_op(int opcode, lai_state state, lai_operand[] operands, ref lai_variable reduction_res)
         {
             lai_variable result = new lai_variable();
+            Console.WriteLine("lai_exec_reduce_op:" + opcode);
 
             switch (opcode)
             {
+                case STORE_OP:
+                    {
+                        lai_variable objectref = new();
+                        lai_variable outt = new();
+                        lai_exec_get_objectref(state, operands, ref objectref);
+
+                        lai_obj_clone(ref result, ref objectref);
+
+                        // Store a copy to the target operand.
+                        // TODO: Verify that we HAVE to make a copy.
+                        lai_obj_clone(ref outt, ref result);
+                        lai_operand_mutate(ref state, ref operands[1], ref result);
+                        break;
+                    }
+                case AND_OP:
+                    {
+                        lai_variable lhs = new();
+                        lai_variable rhs = new();
+                        lai_exec_get_integer(state, operands[0], ref lhs);
+                        lai_exec_get_integer(state, operands[1], ref rhs);
+
+                        result.type = LAI_INTEGER;
+                        result.integer = lhs.integer & rhs.integer;
+                        lai_operand_mutate(ref state, ref operands[2], ref result);
+                        break;
+                    }
+                case LEQUAL_OP:
+                    {
+                        lai_variable lhs = new();
+                        lai_exec_get_objectref(state, operands, ref lhs);
+                        lai_variable rhs = new();
+                        lai_exec_get_objectref(state, cosmos_shift_array_by_index(operands, 1), ref rhs);
+
+                        int res = 0;
+                        var err = lai_obj_exec_match_op(MATCH_MEQ, ref lhs, ref rhs, ref res);
+                        if (err != 0)
+                        {
+                            return 6;
+                        }
+                        result.type = LAI_INTEGER;
+                        result.integer = res != 0 ? ~((ulong)0) : 0;
+                        break;
+                    }
                 default:
                     lai_panic("lai_exec_reduce_op: unknown opcode 0x" + opcode.ToString("X"));
                     break;
@@ -21,7 +65,41 @@ namespace CosmosACPIAML.ACPI
             reduction_res = result;
             return 0;
         }
+        /// <summary>
+        /// Returns an new array that starts with index
+        /// </summary>
+        /// <param name="operands"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        private static lai_operand[] cosmos_shift_array_by_index(lai_operand[] operands, int index)
+        {
+            lai_operand[] new_array = new lai_operand[operands.Length];
+            int j = 0;
+            for (int i = index; i < operands.Length; i++)
+            {
+                new_array[j] = operands[i];
+                j++;
+            }
+            return new_array;
+        }
 
+        private static void lai_operand_mutate(ref lai_state state, ref lai_operand dest, ref lai_variable result)
+        {
+            if (dest.tag == LAI_OPERAND_OBJECT)
+            {
+                switch (dest.objectt.type)
+                {
+                    default:
+                        lai_panic($"unexpected object type {dest.objectt.type} for lai_store_overwrite()");
+                        break;
+                }
+            }
+        }
+
+        private static void lai_obj_clone(ref lai_variable dest, ref lai_variable source)
+        {
+            dest = source;
+        }
         private static int lai_exec_run(lai_state state)
         {
             while (lai_exec_peek_stack_back(state) != null)
@@ -48,7 +126,7 @@ namespace CosmosACPIAML.ACPI
 
             return 0;
         }
-        public static int lai_eval_args(lai_variable result, lai_nsnode handle, lai_state state, int n, lai_variable args)
+        public static int lai_eval_args(ref lai_variable result, lai_nsnode handle, lai_state state, int n, lai_variable args)
         {
             switch (handle.type)
             {
@@ -60,8 +138,7 @@ namespace CosmosACPIAML.ACPI
                     }
                     if (result != null)
                     {
-                        // TODO
-                        lai_panic("TODO: lai_eval args case 1");
+                        lai_obj_clone(ref result, ref handle.objectt);
                     }
                     return 0;
                 case LAI_NAMESPACE_METHOD:
@@ -106,9 +183,27 @@ namespace CosmosACPIAML.ACPI
                             {
                                 lai_panic("opstack should be 1 after running lai_exec_run");
                             }
-
-                            // TODO
+                            var opstack_top = lai_exec_get_opstack(state, 0);
+                            lai_variable objectref = new();
+                            lai_exec_get_objectref(state, opstack_top, ref objectref);
+                            Console.WriteLine("opstacktop is " + objectref.type+" with val"+objectref.integer);
+                            lai_obj_clone(ref method_result, ref objectref);
+                            lai_var_finalize(objectref);
+                            lai_exec_pop_opstack(ref state, 1);
                         }
+                        else
+                        {
+                            Console.WriteLine("lai_exec_run failed");
+                            // If there is an error the lai_state_t is probably corrupted, we should reset
+                            // it
+                            state = new();
+                        }
+                    }
+
+                    if (e == 0 && result != null)
+                    {
+                        Console.WriteLine("method result OK, returned "+method_result.integer+", type "+method_result.type);
+                        result = method_result;
                     }
 
                     return e;
@@ -117,9 +212,10 @@ namespace CosmosACPIAML.ACPI
             }
 
         }
-        public static int lai_eval(lai_variable result, lai_nsnode handle, lai_state state)
+        public static int lai_eval(ref lai_variable result, lai_nsnode handle, lai_state state)
         {
-            return lai_eval_args(result, handle, state, 0, null);
+            Console.WriteLine("evaling: " + lai_stringify_node_path(handle));
+            return lai_eval_args(ref result, handle, state, 0, null);
         }
     }
 }

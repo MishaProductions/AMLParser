@@ -4,6 +4,7 @@ using CosmosACPIAMl;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using static Cosmoss.Core.ACPI;
@@ -81,9 +82,15 @@ namespace CosmosACPIAML.ACPI
 
         private static byte[] lai_mode_flags = new byte[] { };
 
-        private const int LAI_UNRESOLVED_NAME = 3;
+
+        // Name types: unresolved names and names of certain objects.
         private const int LAI_OPERAND_OBJECT = 1;
         private const int LAI_NULL_NAME = 2;
+        private const int LAI_UNRESOLVED_NAME = 3;
+        private const int LAI_RESOLVED_NAME = 4;
+        private const int LAI_ARG_NAME = 5;
+        private const int LAI_LOCAL_NAME = 6;
+        private const int LAI_DEBUG_NAME = 7;
 
         private const int LAI_INTEGER = 1;
         private const int LAI_STRING = 2;
@@ -100,9 +107,7 @@ namespace CosmosACPIAML.ACPI
         private const int LAI_STRING_INDEX = 10;
         private const int LAI_BUFFER_INDEX = 11;
         private const int LAI_PACKAGE_INDEX = 12;
-
-
-        private const int LAI_RESOLVED_NAME = 4;
+        private const int LAI_COND_BRANCH = 1;
 
         #region opcodes
         private const int ZERO_OP = 0x00;
@@ -553,7 +558,7 @@ namespace CosmosACPIAML.ACPI
                         lai_panic("opstack is not empty before return");
                     }
 
-                    if(item.mth_want_result != 0)
+                    if (item.mth_want_result != 0)
                     {
                         lai_operand result = lai_exec_push_opstack(ref state);
                         result.tag = LAI_OPERAND_OBJECT;
@@ -612,7 +617,6 @@ namespace CosmosACPIAML.ACPI
                 }
                 else
                 {
-                    lai_log("buffer op: we need more data!");
                     return lai_exec_parse(LAI_OBJECT_MODE, ref state);
                 }
             }
@@ -662,7 +666,7 @@ namespace CosmosACPIAML.ACPI
                     //pkg->pkg_ptr[i] = 
                     //package.objectt.pk
 
-                    lai_log("todo write stuff");
+                    // lai_log("todo write stuff");
 
                     item.pkg_phase++;
                     state.stack_base[state.stack_base.Count - 1] = item;
@@ -743,7 +747,7 @@ namespace CosmosACPIAML.ACPI
             else if (item.kind == LAI_RETURN_STACKITEM)
             {
                 int k = state.opstack_base.Count - item.opstack_frame;
-                LAI_ENSURE(k <= 1,"k <= 1");
+                LAI_ENSURE(k <= 1, "k <= 1");
 
                 if (k == 1)
                 {
@@ -767,7 +771,7 @@ namespace CosmosACPIAML.ACPI
 
                         if (method_item.kind == LAI_METHOD_STACKITEM)
                             break;
-                        if(method_item.kind == LAI_COND_STACKITEM && method_item.kind != LAI_LOOP_STACKITEM)
+                        if (method_item.kind == LAI_COND_STACKITEM && method_item.kind != LAI_LOOP_STACKITEM)
                         {
                             lai_panic("Return() cannot skip item of type " + method_item.kind);
                         }
@@ -817,8 +821,59 @@ namespace CosmosACPIAML.ACPI
             }
             else if (item.kind == LAI_COND_STACKITEM)
             {
-                lai_panic("LAI_COND_STACKITEM: not implemtented");
-                return 1;
+                if (item.cond_state == 0)
+                {
+                    int k = state.opstack_base.Count - item.opstack_frame;
+                    // We are at the beginning of the condition and need to check the predicate.
+                    LAI_ENSURE(k <= 1, "LAI_COND_STACKITEM k <= 1");
+                    if (k == 1)
+                    {
+                        lai_variable predicate = new lai_variable();
+                        lai_operand[] operand = lai_exec_get_opstack(state, item.opstack_frame);
+                        lai_exec_get_integer(state, operand[0], ref predicate);
+                        lai_exec_pop_opstack_back(ref state);
+
+                        if (predicate.integer != 0)
+                        {
+                            item.cond_state = LAI_COND_BRANCH;
+                        }
+                        else
+                        {
+                            if (item.cond_has_else != 0)
+                            {
+                                item.cond_state = LAI_COND_BRANCH;
+                                block.pc = item.cond_else_pc;
+                                block.limit = item.cond_else_limit;
+                            }
+                            else
+                            {
+                                Console.WriteLine("if statement end 2");
+                                lai_exec_pop_blkstack_back(ref state);
+                                lai_exec_pop_stack_back(ref state);
+                            }
+                        }
+                        return 0;
+                    }
+                    else
+                    {
+                        return lai_exec_parse(LAI_OBJECT_MODE, ref state);
+                    }
+                }
+                else
+                {
+                    LAI_ENSURE(item.cond_state == LAI_COND_BRANCH, "item.cond_state == LAI_COND_BRANCH");
+                    if (block.pc == block.limit)
+                    {
+                        Console.WriteLine("if statement end");
+                        lai_exec_pop_blkstack_back(ref state);
+                        lai_exec_pop_stack_back(ref state);
+                        return 0;
+                    }
+                    else
+                    {
+                        return lai_exec_parse(LAI_EXEC_MODE, ref state);
+                    }
+                }
             }
             else if (item.kind == LAI_BANKFIELD_STACKITEM)
             {
@@ -862,7 +917,6 @@ namespace CosmosACPIAML.ACPI
         }
         private static void lai_exec_reduce_node(int opcode, lai_state state, lai_operand[] operands, lai_nsnode ctx_handle)
         {
-            lai_log("lai_exec_reduce_node: opcode " + opcode);
             switch (opcode)
             {
                 case NAME_OP:
@@ -1449,6 +1503,46 @@ namespace CosmosACPIAML.ACPI
                         state.opstack_base[state.opstack_base.Count - 1] = opstack_pkg;
                         break;
                     }
+                case IF_OP:
+                    {
+                        int if_pc = 0;
+                        int else_pc = 0;
+                        int has_else = 0;
+                        int if_size = 0;
+                        int else_size = 0;
+
+                        if (lai_parse_varint(ref if_size, method, ref pc, limit))
+                            return 5;
+                        if_pc = pc;
+                        pc = opcode_pc + 1 + if_size;
+                        if (pc < block.limit && method[pc] == ELSE_OP)
+                        {
+                            has_else = 1;
+                            pc++;
+                            if (lai_parse_varint(ref else_size, method, ref pc, limit))
+                                return 5;
+                            else_pc = pc;
+                            pc = opcode_pc + 1 + if_size + 1 + else_size;
+                        }
+
+                        lai_exec_commit_pc(ref state, pc);
+
+                        lai_blkitem blkitem = lai_exec_push_blkstack(ref state, if_pc, opcode_pc + 1 + if_size);
+
+                        lai_stackitem cond_item = lai_exec_push_stack(ref state);
+                        cond_item.kind = LAI_COND_STACKITEM;
+                        cond_item.opstack_frame = state.opstack_base.Count;
+                        cond_item.cond_state = 0;
+                        cond_item.cond_has_else = has_else;
+                        cond_item.cond_else_pc = else_pc;
+                        cond_item.cond_else_limit = opcode_pc + 1 + if_size + 1 + else_size;
+                        break;
+                    }
+                case ELSE_OP:
+                    lai_panic("Else() outside of If()");
+                    break;
+
+                // Scope-like objects in the ACPI namespace.
                 case SCOPE_OP:
                     {
                         int nested_pc;
@@ -1606,6 +1700,31 @@ namespace CosmosACPIAML.ACPI
                         lai_exec_commit_pc(ref state, pc);
                         break;
                     }
+                case LOCAL0_OP:
+                case LOCAL1_OP:
+                case LOCAL2_OP:
+                case LOCAL3_OP:
+                case LOCAL4_OP:
+                case LOCAL5_OP:
+                case LOCAL6_OP:
+                case LOCAL7_OP:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+                        if (parse_mode == LAI_REFERENCE_MODE || parse_mode == LAI_OPTIONAL_REFERENCE_MODE)
+                        {
+                            lai_operand opstack_res = lai_exec_push_opstack(ref state);
+                            opstack_res.tag = LAI_LOCAL_NAME;
+                            opstack_res.index = opcode - LOCAL0_OP;
+                        }
+                        else
+                        {
+                            LAI_ENSURE(parse_mode == LAI_OBJECT_MODE, "parse_mode == LAI_OBJECT_MODE in local* opcodes");
+                            lai_operand opstack_res = lai_exec_push_opstack(ref state);
+                            opstack_res.tag = LAI_OPERAND_OBJECT;
+                            lai_var_assign(ref opstack_res.objectt, invocation.local[opcode - LOCAL0_OP]);
+                        }
+                        break;
+                    }
                 case (EXTOP_PREFIX << 8) | DEVICE:
                     {
                         int nested_pc;
@@ -1720,6 +1839,41 @@ namespace CosmosACPIAML.ACPI
                         lai_stackitem node_item = lai_exec_push_stack(ref state);
                         node_item.kind = LAI_RETURN_STACKITEM;
                         node_item.opstack_frame = state.opstack_base.Count;
+                        break;
+                    }
+                case STORE_OP:
+                case COPYOBJECT_OP:
+                case NOT_OP:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+                        lai_stackitem node_item = lai_exec_push_stack(ref state);
+                        node_item.kind = LAI_OP_STACKITEM;
+                        node_item.op_opcode = opcode;
+                        node_item.op_arg_modes = new byte[4];
+                        node_item.op_arg_modes[0] = LAI_OBJECT_MODE;
+                        node_item.op_arg_modes[1] = LAI_REFERENCE_MODE;
+                        node_item.op_arg_modes[2] = 0;
+                        node_item.op_want_result = (byte)want_result;
+                        break;
+                    }
+
+                case LAND_OP:
+                case LOR_OP:
+                case LEQUAL_OP:
+                case LLESS_OP:
+                case LGREATER_OP:
+                    {
+                        lai_exec_commit_pc(ref state, pc);
+                        lai_stackitem op_item = lai_exec_push_stack(ref state);
+                        op_item.kind = LAI_OP_STACKITEM;
+                        op_item.op_opcode = opcode;
+                        op_item.opstack_frame = state.opstack_base.Count;
+                        op_item.op_arg_modes = new byte[4];
+                        op_item.op_arg_modes[0] = LAI_OBJECT_MODE;
+                        op_item.op_arg_modes[1] = LAI_OBJECT_MODE;
+                        op_item.op_arg_modes[2] = LAI_REFERENCE_MODE;
+                        op_item.op_arg_modes[3] = 0;
+                        op_item.op_want_result = (byte)want_result;
                         break;
                     }
                 default:
@@ -2117,25 +2271,6 @@ namespace CosmosACPIAML.ACPI
 
             return x;
         }
-        private static void lai_install_nsnode(lai_nsnode node)
-        {
-            if (node.parent != null)
-            {
-                foreach (var child in node.parent.children)
-                {
-                    if (child.name == node.name)
-                    {
-                        lai_warn("LAI: Attempt was made to insert duplicate namespace node: " + node.name + ", ignoring");
-                        return;
-                    }
-                }
-                node.parent.children.Add(node);
-            }
-            else
-            {
-                lai_panic("lai_install_nsnode: Node parrent cannot be null. Node name is " + node.name);
-            }
-        }
         private static string lai_stringify_node_path(lai_nsnode node)
         {
             if (node.parent == null)
@@ -2265,8 +2400,8 @@ namespace CosmosACPIAML.ACPI
     }
     public class lai_invocation
     {
-        public byte[] arg;
-        public byte[] local;
+        public lai_variable[] arg = new lai_variable[7];
+        public lai_variable[] local = new lai_variable[8];
 
         //todo: per_method_list
     }

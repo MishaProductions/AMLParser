@@ -13,6 +13,34 @@ namespace CosmosACPIAML.ACPI
         {
             return global_instance;
         }
+        private static void lai_install_nsnode(lai_nsnode node)
+        {
+            if (node.parent != null)
+            {
+                foreach (var child in node.parent.children)
+                {
+                    if (child.name == node.name)
+                    {
+                        lai_warn("LAI: Attempt was made to insert duplicate namespace node: " + node.name + ", ignoring");
+                        return;
+                    }
+                }
+                node.parent.children.Add(node);
+            }
+            else
+            {
+                lai_panic("lai_install_nsnode: Node parrent cannot be null. Node name is " + node.name);
+            }
+        }
+        private static void lai_uninstall_nsnode(lai_nsnode node)
+        {
+            //todo
+        }
+
+        private static lai_nsnode lai_ns_get_root()
+        {
+            return lai_current_instance().RootNode;
+        }
 
         // ...
 
