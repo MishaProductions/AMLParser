@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
+using static CosmosACPIAML.ACPI.LAI;
 
 namespace CosmosACPIAML.ACPI
 {
@@ -46,6 +48,21 @@ namespace CosmosACPIAML.ACPI
             byte bit_offset; // -- generic registers
             byte irq_flags; // valid for IRQs
         };
+
+        public struct lai_prt_iterator
+        {
+            public long i;
+            public lai_variable prt;
+
+            public int slot;
+            public int function;
+            public byte pin;
+            public lai_nsnode link;
+            public long resource_idx;
+            public uint gsi;
+            public byte level_triggered;
+            public byte active_low;
+        }
 
         public static int lai_pci_route(ref acpi_resource dest, byte seg, byte bus, byte slot, byte function)
         {
@@ -98,7 +115,93 @@ namespace CosmosACPIAML.ACPI
                 return lai_api_error.LAI_ERROR_NO_SUCH_NODE;
             }
 
-            // TODO
+            Global.debugger.Send("_PRT found!");
+
+            lai_variable prt = new lai_variable();
+            if (lai_eval(ref prt, prt_handle, state) != 0)
+            {
+                // lai_warn equivalent in C#
+                Console.WriteLine("failed to evaluate _PRT");
+                return lai_api_error.LAI_ERROR_EXECUTION_FAILURE;
+            }
+
+            Global.debugger.Send("_PRT pkg loaded");
+
+            lai_prt_iterator iter = new lai_prt_iterator();
+            iter.prt = prt;
+            lai_api_error err;
+
+            while ((err = LAI.lai_pci_parse_prt(ref iter)) == lai_api_error.LAI_ERROR_NONE)
+            {
+                if (iter.slot == slot && (iter.function == function || iter.function == -1)
+                    && iter.pin == pin)
+                {
+                    Global.debugger.Send("FOUND");
+
+                    return lai_api_error.LAI_ERROR_NONE;
+                }
+            }
+
+
+            return lai_api_error.LAI_ERROR_NONE;
+        }
+
+        public static lai_api_error lai_pci_parse_prt(ref lai_prt_iterator iter)
+        {
+            // Initialize necessary variables
+            lai_variable prt_entry = new lai_variable();
+            lai_variable prt_entry_addr = new lai_variable();
+            lai_variable prt_entry_pin = new lai_variable();
+            lai_variable prt_entry_type = new lai_variable();
+            lai_variable prt_entry_index = new lai_variable();
+
+            Global.debugger.Send("_PRT loading pkg...");
+
+            if (lai_obj_get_pkg(iter.prt, iter.i, ref prt_entry) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            Global.debugger.Send("_PRT pkg loaded");
+
+            Global.debugger.Send("prt_entry.pkg_items[0].integer=" + prt_entry.pkg_items[0].integer);
+
+            iter.i++;
+
+            if (lai_obj_get_pkg(prt_entry, 0, ref prt_entry_addr) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+            if (lai_obj_get_pkg(prt_entry, 1, ref prt_entry_pin) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+            if (lai_obj_get_pkg(prt_entry, 2, ref prt_entry_type) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+            if (lai_obj_get_pkg(prt_entry, 3, ref prt_entry_index) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            Global.debugger.Send("_PRT pkgs loaded");
+
+            ulong addr = 0;
+            if (lai_obj_get_integer(prt_entry_addr, ref addr) != 0)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            Cosmos.HAL.Global.debugger.Send("addr=" + addr);
+
+            Global.debugger.Send("_PRT addr=0x" + addr.ToString("X"));
+
+            iter.slot = (int)((addr >> 16) & 0xFFFF);
+            iter.function = (int)(addr & 0xFFFF);
+
+            if (iter.function == 0xFFFF)
+                iter.function = -1;
+
+            Global.debugger.Send("slot=" + iter.slot);
+            Global.debugger.Send("function=" + iter.function);
+
+            ulong pin = 0;
+            if (lai_obj_get_integer(prt_entry_pin, ref pin) != 0)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            iter.pin = (byte)pin;
+
+            
+            Global.debugger.Send("pin=" + iter.pin);
 
             return lai_api_error.LAI_ERROR_NONE;
         }

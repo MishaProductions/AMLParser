@@ -585,7 +585,6 @@ namespace CosmosACPIAML.ACPI
                 if (k == 1)
                 {
                     lai_log("buffer op: found object in opstack");
-                    Cosmos.HAL.Global.debugger.Send("debug a");
                     var size = new lai_variable();
                     lai_operand operand = lai_exec_get_opstack(state, item.opstack_frame)[0];
                     size = operand.objectt;
@@ -903,9 +902,7 @@ namespace CosmosACPIAML.ACPI
                     }
                 case (EXTOP_PREFIX << 8) | OPREGION:
                     {
-                        Cosmos.HAL.Global.debugger.Send("debug gg");
                         lai_variable basee = new lai_variable();
-                        Cosmos.HAL.Global.debugger.Send("debug ggg");
                         lai_variable size = new lai_variable();
                         lai_exec_get_integer(state, operands[2], ref basee);
                         lai_exec_get_integer(state, operands[3], ref size);
