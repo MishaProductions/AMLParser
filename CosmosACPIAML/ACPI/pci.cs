@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
+using static CosmosACPIAML.ACPI.LAI;
 
 namespace CosmosACPIAML.ACPI
 {
@@ -47,20 +49,24 @@ namespace CosmosACPIAML.ACPI
             byte irq_flags; // valid for IRQs
         };
 
-        public struct lai_ns_iterator
+        public struct lai_prt_iterator
         {
             public long i;
-        }
+            public lai_variable prt;
 
-        public struct lai_ns_child_iterator
-        {
-            public long i;
-            public lai_nsnode parent;
+            public int slot;
+            public int function;
+            public byte pin;
+            public lai_nsnode link;
+            public long resource_idx;
+            public uint gsi;
+            public byte level_triggered;
+            public byte active_low;
         }
 
         public static int lai_pci_route(ref acpi_resource dest, byte seg, byte bus, byte slot, byte function)
         {
-            Console.WriteLine("Searching route for " + seg + ":" + bus + ":" + ":" + slot + ":" + function);
+            Global.debugger.Send("Searching route for " + seg + ":" + bus + ":" + ":" + slot + ":" + function);
 
             PCIDevice device = PCI.GetDevice(bus, slot, function);
             if (device != null && device.DeviceExists)
@@ -70,7 +76,7 @@ namespace CosmosACPIAML.ACPI
                 if (pin == 0 || pin > 4)
                     return 1;
 
-                Console.WriteLine("Pin is " +  pin);
+                Global.debugger.Send("Pin is " +  pin);
 
                 if (lai_pci_route_pin(ref dest, seg, bus, slot, function, pin) != lai_api_error.LAI_ERROR_NONE)
                     return 1;
@@ -90,22 +96,112 @@ namespace CosmosACPIAML.ACPI
             // Adjusting pin number for ACPI
             pin--;
 
-            Console.WriteLine("Finding bus...");
+            Global.debugger.Send("Finding bus...");
 
             // Find the PCI bus in the namespace
             lai_nsnode handle = lai_pci_find_bus(seg, bus, ref state);
             if (handle == null)
                 return lai_api_error.LAI_ERROR_NO_SUCH_NODE;
 
+            Global.debugger.Send("handle=" + handle.name);
+
+            Global.debugger.Send("Finding _PRT...");
+
             // Read the PCI routing table
             lai_nsnode prt_handle = lai_resolve_path(handle, "_PRT");
             if (prt_handle == null)
             {
-                Console.WriteLine("host bridge has no _PRT");
+                Global.debugger.Send("host bridge has no _PRT");
                 return lai_api_error.LAI_ERROR_NO_SUCH_NODE;
             }
 
-            // TODO
+            Global.debugger.Send("_PRT found!");
+
+            lai_variable prt = new lai_variable();
+            if (lai_eval(ref prt, prt_handle, state) != 0)
+            {
+                // lai_warn equivalent in C#
+                Console.WriteLine("failed to evaluate _PRT");
+                return lai_api_error.LAI_ERROR_EXECUTION_FAILURE;
+            }
+
+            Global.debugger.Send("_PRT pkg loaded");
+
+            lai_prt_iterator iter = new lai_prt_iterator();
+            iter.prt = prt;
+            lai_api_error err;
+
+            while ((err = LAI.lai_pci_parse_prt(ref iter)) == lai_api_error.LAI_ERROR_NONE)
+            {
+                if (iter.slot == slot && (iter.function == function || iter.function == -1)
+                    && iter.pin == pin)
+                {
+                    Global.debugger.Send("FOUND");
+
+                    return lai_api_error.LAI_ERROR_NONE;
+                }
+            }
+
+
+            return lai_api_error.LAI_ERROR_NONE;
+        }
+
+        public static lai_api_error lai_pci_parse_prt(ref lai_prt_iterator iter)
+        {
+            // Initialize necessary variables
+            lai_variable prt_entry = new lai_variable();
+            lai_variable prt_entry_addr = new lai_variable();
+            lai_variable prt_entry_pin = new lai_variable();
+            lai_variable prt_entry_type = new lai_variable();
+            lai_variable prt_entry_index = new lai_variable();
+
+            Global.debugger.Send("_PRT loading pkg...");
+
+            if (lai_obj_get_pkg(iter.prt, iter.i, ref prt_entry) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            Global.debugger.Send("_PRT pkg loaded");
+
+            Global.debugger.Send("prt_entry.pkg_items[0].integer=" + prt_entry.pkg_items[0].integer);
+
+            iter.i++;
+
+            if (lai_obj_get_pkg(prt_entry, 0, ref prt_entry_addr) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+            if (lai_obj_get_pkg(prt_entry, 1, ref prt_entry_pin) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+            if (lai_obj_get_pkg(prt_entry, 2, ref prt_entry_type) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+            if (lai_obj_get_pkg(prt_entry, 3, ref prt_entry_index) != lai_api_error.LAI_ERROR_NONE)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            Global.debugger.Send("_PRT pkgs loaded");
+
+            ulong addr = 0;
+            if (lai_obj_get_integer(prt_entry_addr, ref addr) != 0)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            Cosmos.HAL.Global.debugger.Send("addr=" + addr);
+
+            Global.debugger.Send("_PRT addr=0x" + addr.ToString("X"));
+
+            iter.slot = (int)((addr >> 16) & 0xFFFF);
+            iter.function = (int)(addr & 0xFFFF);
+
+            if (iter.function == 0xFFFF)
+                iter.function = -1;
+
+            Global.debugger.Send("slot=" + iter.slot);
+            Global.debugger.Send("function=" + iter.function);
+
+            ulong pin = 0;
+            if (lai_obj_get_integer(prt_entry_pin, ref pin) != 0)
+                return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+            iter.pin = (byte)pin;
+
+            
+            Global.debugger.Send("pin=" + iter.pin);
 
             return lai_api_error.LAI_ERROR_NONE;
         }
@@ -117,15 +213,58 @@ namespace CosmosACPIAML.ACPI
             lai_eisaid(ref pci_pnp_id, ACPI_PCI_ROOT_BUS_PNP_ID);
             lai_eisaid(ref pcie_pnp_id, ACPI_PCIE_ROOT_BUS_PNP_ID);
 
+            Global.debugger.Send("Finding _SB_...");
+
             lai_nsnode sb_handle = lai_resolve_path(null, "\\_SB_");
             if (sb_handle == null) return null; // Ensuring sb_handle is not null
 
-            var iter = new lai_ns_child_iterator(); // Initialize the iterator
-            lai_nsnode node;
+            Global.debugger.Send("_SB_ found!");
 
-            while ((node = lai_ns_child_iterate(iter)) != null)
+            Global.debugger.Send("Iterating...");
+
+            foreach (var node in sb_handle.children)
             {
-                
+                Global.debugger.Send("Iterating inside...");
+
+                if (lai_check_device_pnp_id(node, pci_pnp_id, state) != 0
+                && lai_check_device_pnp_id(node, pcie_pnp_id, state) != 0)
+                {
+                    Global.debugger.Send("Process each node for matching PCI or PCIe IDs...");
+                    continue;
+                }
+
+                lai_variable bus_number = new lai_variable();
+                ulong bbn_result = 0;
+                lai_nsnode bbn_handle = lai_resolve_path(node, "_BBN");
+                if (bbn_handle != null)
+                {
+                    Global.debugger.Send("Process _BBN method");
+                    if (lai_eval(ref bus_number, bbn_handle, state) != 0)
+                    {
+                        lai_warn("failed to evaluate _BBN");
+                        continue;
+                    }
+                    lai_obj_get_integer(bus_number, ref bbn_result);
+                }
+                Cosmos.HAL.Global.debugger.Send("debug l");
+                lai_variable seg_number = new lai_variable();
+                ulong seg_result = 0;
+                lai_nsnode seg_handle = lai_resolve_path(node, "_SEG");
+                if (seg_handle != null)
+                {
+                    Global.debugger.Send("Process _SEG method");
+                    if (lai_eval(ref seg_number, seg_handle, state) != 0)
+                    {
+                        lai_warn("failed to evaluate _SEG");
+                        continue;
+                    }
+                    lai_obj_get_integer(seg_number, ref seg_result);
+                }
+
+                if (seg_result == seg && bbn_result == bus)
+                {
+                    return node;
+                }
             }
 
             return null;

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
+using System.Xml;
 using static Cosmoss.Core.ACPI;
 
 namespace CosmosACPIAML.ACPI
@@ -561,6 +562,8 @@ namespace CosmosACPIAML.ACPI
                         result.objectt.integer = 0;
                     }
 
+                    Cosmos.HAL.Global.debugger.Send("TODO Clean up all per-method namespace nodes.");
+
                     // Clean up all per-method namespace nodes.
                     // TODO
 
@@ -586,7 +589,6 @@ namespace CosmosACPIAML.ACPI
                     lai_operand operand = lai_exec_get_opstack(state, item.opstack_frame)[0];
                     size = operand.objectt;
                     lai_exec_pop_opstack_back(ref state);
-
                     var result = new lai_variable();
                     int initial_size = block.limit - block.pc;
                     if (initial_size < 0)
@@ -662,7 +664,7 @@ namespace CosmosACPIAML.ACPI
                     //pkg->pkg_ptr[i] = 
                     //package.objectt.pk
 
-                    lai_log("todo write stuff");
+                    lai_exec_pkg_store(ref initializer.objectt, ref package.objectt, (ulong)item.pkg_index);
 
                     item.pkg_phase++;
                     state.stack_base[state.stack_base.Count - 1] = item;
@@ -747,6 +749,7 @@ namespace CosmosACPIAML.ACPI
 
                 if (k == 1)
                 {
+                    Cosmos.HAL.Global.debugger.Send("debug e");
                     lai_variable result = new();
                     lai_operand[] operand = lai_exec_get_opstack(state, item.opstack_frame);
                     lai_exec_get_objectref(state, operand, ref result);
@@ -835,12 +838,17 @@ namespace CosmosACPIAML.ACPI
         private static void lai_exec_get_objectref(lai_state state, lai_operand[] src, ref lai_variable objectt)
         {
             LAI_ENSURE(src[0].tag == LAI_OPERAND_OBJECT, "src[0].tag == LAI_OPERAND_OBJECT");
-            lai_var_assign(ref objectt, src[0].objectt);
+            objectt = src[0].objectt;
         }
 
-        private static void lai_var_assign(ref lai_variable dest, lai_variable src)
+        public void lai_rc_ref(ref int rc_ptr)
         {
-            dest = src;
+            rc_ptr++;
+
+            if (rc_ptr <= 0)
+            {
+                throw new InvalidOperationException("Reference count must be positive");
+            }
         }
 
         private static void lai_var_finalize(lai_variable result)
@@ -869,7 +877,7 @@ namespace CosmosACPIAML.ACPI
                     {
                         lai_variable objectt = new lai_variable();
                         // ..lai_exec_get_objectref(state, &operands[1], objectt);
-                        objectt = operands[0].objectt;
+                        objectt = operands[1].objectt;
 
                         if (operands[0].tag != LAI_UNRESOLVED_NAME)
                         {
@@ -1188,6 +1196,7 @@ namespace CosmosACPIAML.ACPI
                     else if ((ReadFlags(parse_mode) & LAI_MF_INVOKE) != 0)
                     {
                         // TODO: Get rid of this case again!
+                        Cosmos.HAL.Global.debugger.Send("debug g");
                         lai_variable var = new();
                         lai_exec_access(ref var, handle);
                         if (want_result != 0)
@@ -1737,7 +1746,6 @@ namespace CosmosACPIAML.ACPI
             switch (src.type)
             {
                 case LAI_NAMESPACE_NAME:
-                    // lai_var_assign(var, src.objectt);
                     var = src.objectt;
                     break;
                 case LAI_NAMESPACE_FIELD:
@@ -2242,6 +2250,10 @@ namespace CosmosACPIAML.ACPI
     }
     public unsafe class lai_variable
     {
+        public lai_variable()
+        {
+        }
+
         public int type;
         /// <summary>
         /// For Name()
@@ -2299,7 +2311,6 @@ namespace CosmosACPIAML.ACPI
         public int stack_capacity;
         public int opstack_capacity;
 
-        public int ctxstack_ptr; // Stack to track the current context.
         public int blkstack_ptr; // Stack to track the current block.
         public int stack_ptr; // Stack to track the current execution state.
         public int opstack_ptr;

@@ -15,7 +15,6 @@ namespace CosmosACPIAML.ACPI
             state.blkstack_capacity = 8;
             state.stack_capacity = 16;
             state.opstack_capacity = 16;
-            state.ctxstack_ptr = -1;
             state.blkstack_ptr = -1;
             state.stack_ptr = -1;
         }
@@ -60,8 +59,12 @@ namespace CosmosACPIAML.ACPI
 
             return 0;
         }
-        public static int lai_eval_args(lai_variable result, lai_nsnode handle, lai_state state, int n, lai_variable args)
+        public static int lai_eval_args(ref lai_variable result, lai_nsnode handle, lai_state state, int n, lai_variable args)
         {
+            Cosmos.HAL.Global.debugger.Send("lai_eval_args handle.type=" + handle.type);
+            Cosmos.HAL.Global.debugger.Send("lai_eval_args handle.objectt.type=" + handle.objectt.type);
+            Cosmos.HAL.Global.debugger.Send("lai_eval_args handle.objectt.stringval=" + handle.objectt.stringval);
+            Cosmos.HAL.Global.debugger.Send("lai_eval_args handle.objectt.integer=" + handle.objectt.integer);
             switch (handle.type)
             {
                 case LAI_NAMESPACE_NAME:
@@ -72,8 +75,8 @@ namespace CosmosACPIAML.ACPI
                     }
                     if (result != null)
                     {
-                        // TODO
-                        lai_panic("TODO: lai_eval args case 1");
+                        lai_obj_clone(ref result, handle.objectt);
+                        Cosmos.HAL.Global.debugger.Send("result.type=" + result.type);
                     }
                     return 0;
                 case LAI_NAMESPACE_METHOD:
@@ -119,6 +122,7 @@ namespace CosmosACPIAML.ACPI
                                 lai_panic("opstack should be 1 after running lai_exec_run");
                             }
 
+                            Cosmos.HAL.Global.debugger.Send("LAI_NAMESPACE_METHOD TODO 1");
                             // TODO
                         }
                     }
@@ -129,9 +133,9 @@ namespace CosmosACPIAML.ACPI
             }
 
         }
-        public static int lai_eval(lai_variable result, lai_nsnode handle, lai_state state)
+        public static int lai_eval(ref lai_variable result, lai_nsnode handle, lai_state state)
         {
-            return lai_eval_args(result, handle, state, 0, null);
+            return lai_eval_args(ref result, handle, state, 0, null);
         }
     }
 }

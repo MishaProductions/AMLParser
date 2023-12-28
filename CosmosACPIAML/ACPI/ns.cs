@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -60,6 +61,7 @@ namespace CosmosACPIAML.ACPI
 
             if (offset >= path.Length)
             {
+                Cosmos.HAL.Global.debugger.Send("offset >= path.Length");
                 return current;
             }
 
@@ -108,11 +110,79 @@ namespace CosmosACPIAML.ACPI
             return current;
         }
 
-        public static lai_nsnode lai_ns_child_iterate(lai_ns_child_iterator iter)
+        public static int lai_check_device_pnp_id(lai_nsnode dev, lai_variable pnp_id, lai_state state)
         {
-            // TODO
+            Cosmos.HAL.Global.debugger.Send("lai_check_device_pnp_id for dev.name=" + dev.name + " pnp_id.type=" + pnp_id.type);
 
-            return null; // Equivalent to returning NULL in C
+            Cosmos.HAL.Global.debugger.Send("debug i");
+            lai_variable id = new lai_variable();
+            int ret = 1;
+
+            lai_nsnode hid_handle = lai_resolve_path(dev, "_HID");
+            if (hid_handle != null)
+            {
+                Cosmos.HAL.Global.debugger.Send("_HID found!");
+
+                if (lai_eval(ref id, hid_handle, state) != 0)
+                {
+                    LAI.lai_warn("could not evaluate _HID of device");
+                }
+                else
+                {
+                    LAI.LAI_ENSURE(id.type != 0, "id.type != 0");
+                }
+            }
+
+            if (id.type == 0)
+            {
+                Cosmos.HAL.Global.debugger.Send("id.type == 0");
+
+                lai_nsnode cid_handle = lai_resolve_path(dev, "_CID");
+                if (cid_handle != null)
+                {
+                    if (lai_eval(ref id, cid_handle, state) != 0)
+                    {
+                        LAI.lai_warn("could not evaluate _CID of device");
+                        return 1;
+                    }
+                    else
+                    {
+                        LAI.LAI_ENSURE(id.type != 0, "id.type != 0");
+                    }
+                }
+                else
+                {
+                    Cosmos.HAL.Global.debugger.Send("_CID nt found!");
+                }
+            }
+
+            Cosmos.HAL.Global.debugger.Send("id.type=" + id.type + " pnp_id.type=" + pnp_id.type);
+
+            if (id.type == LAI_INTEGER && pnp_id.type == LAI_INTEGER)
+            {
+                Cosmos.HAL.Global.debugger.Send("id.type == LAI_INTEGER && pnp_id.type == LAI_INTEGER");
+
+                if (id.integer == pnp_id.integer)
+                {
+                    Cosmos.HAL.Global.debugger.Send("MATCH!");
+
+                    ret = 0; // IDs match
+                }
+            }
+            else if (id.type == LAI_STRING && pnp_id.type == LAI_STRING)
+            {
+                Cosmos.HAL.Global.debugger.Send("id.type == LAI_STRING && pnp_id.type == LAI_STRING");
+
+                if (id.stringval == pnp_id.stringval)
+                {
+                    Cosmos.HAL.Global.debugger.Send("MATCH!");
+
+                    ret = 0; // String IDs match
+                }
+            }
+
+            lai_var_finalize(id);
+            return ret;
         }
     }
 

@@ -28,7 +28,8 @@ namespace CosmosACPIAML.ACPI
             else
             {
                 lai_state state = new lai_state();
-                if (lai_eval(null, handle, state) == 0)
+                lai_variable var = null;
+                if (lai_eval(ref var, handle, state) == 0)
                 {
                     Console.WriteLine("evaluated \\_SB_._INI");
                 }
@@ -50,9 +51,10 @@ namespace CosmosACPIAML.ACPI
             if (handle != null)
             {
                 lai_state state = new lai_state();
+                Cosmos.HAL.Global.debugger.Send("debug m");
                 lai_variable result = new lai_variable();
 
-                var err = lai_eval(result, handle, state);
+                var err = lai_eval(ref result, handle, state);
                 if (err != 0)
                 {
                     Console.WriteLine("could not evaluate _STA, ignoring device");
@@ -84,7 +86,8 @@ namespace CosmosACPIAML.ACPI
                         if (handle != null)
                         {
                             var state = new lai_state();
-                            if (lai_eval(null, handle, state) == 0)
+                            lai_variable var = null;
+                            if (lai_eval(ref var, handle, state) == 0)
                             {
                                 Console.WriteLine("evaluated " + lai_stringify_node_path(handle));
                             }
