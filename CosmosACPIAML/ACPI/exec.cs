@@ -8,6 +8,18 @@ namespace CosmosACPIAML.ACPI
 {
     public unsafe partial class LAI
     {
+        public static void lai_init_state(ref lai_state state)
+        {
+            state = new lai_state();
+            state.ctxstack_capacity = 8;
+            state.blkstack_capacity = 8;
+            state.stack_capacity = 16;
+            state.opstack_capacity = 16;
+            state.ctxstack_ptr = -1;
+            state.blkstack_ptr = -1;
+            state.stack_ptr = -1;
+        }
+
         private static int lai_exec_reduce_op(int opcode, lai_state state, lai_operand[] operands, ref lai_variable reduction_res)
         {
             lai_variable result = new lai_variable();
