@@ -112,7 +112,7 @@ namespace CosmosACPIAML.ACPI
 
         public static int lai_check_device_pnp_id(lai_nsnode dev, lai_variable pnp_id, lai_state state)
         {
-            Cosmos.HAL.Global.debugger.Send("lai_check_device_pnp_id for dev=" + dev.name + " pnp_id=" + pnp_id.stringval);
+            Cosmos.HAL.Global.debugger.Send("lai_check_device_pnp_id for dev.name=" + dev.name + " pnp_id.type=" + pnp_id.type);
 
             Cosmos.HAL.Global.debugger.Send("debug i");
             lai_variable id = new lai_variable();
@@ -123,7 +123,7 @@ namespace CosmosACPIAML.ACPI
             {
                 Cosmos.HAL.Global.debugger.Send("_HID found!");
 
-                if (lai_eval(id, hid_handle, state) != 0)
+                if (lai_eval(ref id, hid_handle, state) != 0)
                 {
                     LAI.lai_warn("could not evaluate _HID of device");
                 }
@@ -140,7 +140,7 @@ namespace CosmosACPIAML.ACPI
                 lai_nsnode cid_handle = lai_resolve_path(dev, "_CID");
                 if (cid_handle != null)
                 {
-                    if (lai_eval(id, cid_handle, state) != 0)
+                    if (lai_eval(ref id, cid_handle, state) != 0)
                     {
                         LAI.lai_warn("could not evaluate _CID of device");
                         return 1;

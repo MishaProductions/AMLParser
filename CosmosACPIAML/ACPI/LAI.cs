@@ -562,6 +562,8 @@ namespace CosmosACPIAML.ACPI
                         result.objectt.integer = 0;
                     }
 
+                    Cosmos.HAL.Global.debugger.Send("TODO Clean up all per-method namespace nodes.");
+
                     // Clean up all per-method namespace nodes.
                     // TODO
 
@@ -588,7 +590,6 @@ namespace CosmosACPIAML.ACPI
                     lai_operand operand = lai_exec_get_opstack(state, item.opstack_frame)[0];
                     size = operand.objectt;
                     lai_exec_pop_opstack_back(ref state);
-                    Cosmos.HAL.Global.debugger.Send("debug b");
                     var result = new lai_variable();
                     int initial_size = block.limit - block.pc;
                     if (initial_size < 0)
@@ -638,7 +639,6 @@ namespace CosmosACPIAML.ACPI
                 }
                 else if (item.pkg_phase == 1)
                 {
-                    Cosmos.HAL.Global.debugger.Send("debug c");
                     lai_variable size = new lai_variable();
                     lai_exec_get_integer(state, frame[1], ref size);
 
@@ -665,7 +665,7 @@ namespace CosmosACPIAML.ACPI
                     //pkg->pkg_ptr[i] = 
                     //package.objectt.pk
 
-                    lai_log("todo write stuff");
+                    lai_exec_pkg_store(ref initializer.objectt, ref package.objectt, (ulong)item.pkg_index);
 
                     item.pkg_phase++;
                     state.stack_base[state.stack_base.Count - 1] = item;
@@ -710,7 +710,6 @@ namespace CosmosACPIAML.ACPI
                 int k = state.opstack_base.Count - item.opstack_frame;
                 if (item.op_arg_modes[k] == 0)
                 {
-                    Cosmos.HAL.Global.debugger.Send("debug d");
                     lai_variable result = new lai_variable();
                     var operands = lai_exec_get_opstack(state, item.opstack_frame);
                     var error = lai_exec_reduce_op(item.op_opcode, state, operands, ref result);
@@ -840,12 +839,17 @@ namespace CosmosACPIAML.ACPI
         private static void lai_exec_get_objectref(lai_state state, lai_operand[] src, ref lai_variable objectt)
         {
             LAI_ENSURE(src[0].tag == LAI_OPERAND_OBJECT, "src[0].tag == LAI_OPERAND_OBJECT");
-            lai_var_assign(ref objectt, src[0].objectt);
+            objectt = src[0].objectt;
         }
 
-        private static void lai_var_assign(ref lai_variable dest, lai_variable src)
+        public void lai_rc_ref(ref int rc_ptr)
         {
-            dest = src;
+            rc_ptr++;
+
+            if (rc_ptr <= 0)
+            {
+                throw new InvalidOperationException("Reference count must be positive");
+            }
         }
 
         private static void lai_var_finalize(lai_variable result)
@@ -872,10 +876,9 @@ namespace CosmosACPIAML.ACPI
             {
                 case NAME_OP:
                     {
-                        Cosmos.HAL.Global.debugger.Send("debug f");
                         lai_variable objectt = new lai_variable();
                         // ..lai_exec_get_objectref(state, &operands[1], objectt);
-                        objectt = operands[0].objectt;
+                        objectt = operands[1].objectt;
 
                         if (operands[0].tag != LAI_UNRESOLVED_NAME)
                         {
@@ -1746,7 +1749,6 @@ namespace CosmosACPIAML.ACPI
             switch (src.type)
             {
                 case LAI_NAMESPACE_NAME:
-                    // lai_var_assign(var, src.objectt);
                     var = src.objectt;
                     break;
                 case LAI_NAMESPACE_FIELD:
@@ -2114,7 +2116,6 @@ namespace CosmosACPIAML.ACPI
         }
         public static lai_operand lai_exec_push_opstack(ref lai_state state)
         {
-            Cosmos.HAL.Global.debugger.Send("debug h");
             state.opstack_base.Add(new lai_operand() { objectt = new lai_variable() });
 
             return state.opstack_base[state.opstack_base.Count - 1];
@@ -2252,27 +2253,11 @@ namespace CosmosACPIAML.ACPI
     }
     public unsafe class lai_variable
     {
-        private readonly Guid _uniqueId;
-
         public lai_variable()
         {
-            _uniqueId = Guid.NewGuid();
-            Cosmos.HAL.Global.debugger.Send("lai_variable created; guid=" + _uniqueId.ToString());
         }
 
-        private int _type = 0;
-        public int type
-        {
-            get
-            {
-                return _type;
-            }
-            set
-            {
-                Cosmos.HAL.Global.debugger.Send(_uniqueId.ToString() + " _type changed to " + _type);
-                _type = value;
-            }
-        }
+        public int type;
         /// <summary>
         /// For Name()
         /// </summary>
@@ -2292,11 +2277,6 @@ namespace CosmosACPIAML.ACPI
         internal lai_nsnode unres_ctx_handle;
 
         public string stringval;
-
-        public Guid GetUniqueId()
-        {
-            return _uniqueId;
-        }
     }
     public class lai_invocation
     {

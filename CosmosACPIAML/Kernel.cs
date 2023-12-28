@@ -1,4 +1,5 @@
-﻿using Cosmos.Core;
+﻿using ACPIAML;
+using Cosmos.Core;
 using Cosmos.Core.Memory;
 using Cosmos.Core.Multiboot;
 using Cosmos.Core.Multiboot.Tags;
@@ -72,6 +73,7 @@ namespace CosmosACPIAMl
             {
                 Console.WriteLine("ACPI Start error: " + e.Message);
             }
+
             Console.WriteLine("ACPI init done");
 
         }

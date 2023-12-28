@@ -130,14 +130,13 @@ namespace CosmosACPIAML.ACPI
                     continue;
                 }
 
-                Cosmos.HAL.Global.debugger.Send("debug j");
                 lai_variable bus_number = new lai_variable();
                 ulong bbn_result = 0;
                 lai_nsnode bbn_handle = lai_resolve_path(node, "_BBN");
                 if (bbn_handle != null)
                 {
                     Global.debugger.Send("Process _BBN method");
-                    if (lai_eval(bus_number, bbn_handle, state) != 0)
+                    if (lai_eval(ref bus_number, bbn_handle, state) != 0)
                     {
                         lai_warn("failed to evaluate _BBN");
                         continue;
@@ -151,7 +150,7 @@ namespace CosmosACPIAML.ACPI
                 if (seg_handle != null)
                 {
                     Global.debugger.Send("Process _SEG method");
-                    if (lai_eval(seg_number, seg_handle, state) != 0)
+                    if (lai_eval(ref seg_number, seg_handle, state) != 0)
                     {
                         lai_warn("failed to evaluate _SEG");
                         continue;
