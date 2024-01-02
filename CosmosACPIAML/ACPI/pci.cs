@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -59,7 +60,7 @@ namespace CosmosACPIAML.ACPI
             public byte pin;
             public lai_nsnode link;
             public long resource_idx;
-            public uint gsi;
+            public ulong gsi;
             public byte level_triggered;
             public byte active_low;
         }
@@ -155,14 +156,8 @@ namespace CosmosACPIAML.ACPI
             lai_variable prt_entry_type = new lai_variable();
             lai_variable prt_entry_index = new lai_variable();
 
-            Global.debugger.Send("_PRT loading pkg...");
-
             if (lai_obj_get_pkg(iter.prt, iter.i, ref prt_entry) != lai_api_error.LAI_ERROR_NONE)
                 return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
-
-            Global.debugger.Send("_PRT pkg loaded");
-
-            Global.debugger.Send("prt_entry.pkg_items[0].integer=" + prt_entry.pkg_items[0].integer);
 
             iter.i++;
 
@@ -175,15 +170,11 @@ namespace CosmosACPIAML.ACPI
             if (lai_obj_get_pkg(prt_entry, 3, ref prt_entry_index) != lai_api_error.LAI_ERROR_NONE)
                 return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
 
-            Global.debugger.Send("_PRT pkgs loaded");
-
             ulong addr = 0;
             if (lai_obj_get_integer(prt_entry_addr, ref addr) != 0)
                 return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
 
-            Cosmos.HAL.Global.debugger.Send("addr=" + addr);
-
-            Global.debugger.Send("_PRT addr=0x" + addr.ToString("X"));
+            Global.debugger.Send("addr=0x" + addr.ToString("X"));
 
             iter.slot = (int)((addr >> 16) & 0xFFFF);
             iter.function = (int)(addr & 0xFFFF);
@@ -203,7 +194,60 @@ namespace CosmosACPIAML.ACPI
             
             Global.debugger.Send("pin=" + iter.pin);
 
-            return lai_api_error.LAI_ERROR_NONE;
+            lai_object_type type = lai_obj_get_type(prt_entry_type);
+            if (type == lai_object_type.LAI_TYPE_INTEGER)
+            {
+                Global.debugger.Send("type=LAI_TYPE_INTEGER");
+
+                ulong gsi = 0;
+                if (lai_obj_get_integer(prt_entry_index, ref gsi) != 0)
+                    return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+                // TODO: Look up the GSI in the _CRS of the host bridge.
+                iter.link = null;
+                iter.resource_idx = 0;
+                iter.level_triggered = 1;
+                iter.active_low = 1;
+                iter.gsi = gsi;
+                return lai_api_error.LAI_ERROR_NONE;
+            }
+            else if (type == lai_object_type.LAI_TYPE_DEVICE)
+            {
+                Global.debugger.Send("type=LAI_TYPE_DEVICE");
+
+                lai_nsnode link_handle = new lai_nsnode();
+                ulong res_index = 0;
+                if (lai_obj_get_handle(prt_entry_type, ref link_handle) != 0)
+                    return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+                if (lai_obj_get_integer(prt_entry_index, ref res_index) != 0)
+                    return lai_api_error.LAI_ERROR_UNEXPECTED_RESULT;
+
+                // Get _CRS of the link device.
+                lai_state state = new();
+                lai_init_state(ref state);
+
+                lai_nsnode crs_handle = lai_resolve_path(link_handle, "_CRS");
+                if (crs_handle == null)
+                {
+                    Global.debugger.Send("host bridge has no _CRS");
+                    return lai_api_error.LAI_ERROR_NO_SUCH_NODE;
+                }
+
+                lai_variable crs_buffer = new lai_variable();
+                int status = lai_eval(ref crs_buffer, crs_handle, state);
+                if (status != 0)
+                    return lai_api_error.LAI_ERROR_EXECUTION_FAILURE;
+
+                Global.debugger.Send("Find the _CRS entry based on its index.");
+                // Find the _CRS entry based on its index.
+
+                return lai_api_error.LAI_ERROR_NONE;
+            }
+            else
+            {
+                lai_warn("PRT entry has unexpected type " + prt_entry_type.integer);
+                return lai_api_error.LAI_ERROR_TYPE_MISMATCH;
+            }
         }
 
         public static lai_nsnode lai_pci_find_bus(ushort seg, byte bus, ref lai_state state)
