@@ -665,8 +665,7 @@ namespace CosmosACPIAML.ACPI
                     //package.objectt.pk
 
                     lai_exec_pkg_store(ref initializer.objectt, ref package.objectt, (ulong)item.pkg_index);
-
-                    item.pkg_phase++;
+                    item.pkg_index++;
                     state.stack_base[state.stack_base.Count - 1] = item;
                     lai_exec_pop_opstack_back(ref state);
                 }
